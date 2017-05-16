@@ -11,6 +11,8 @@ RewriteRule ^ - [L]
 RewriteRule ^(wp-(content|admin|includes).*) $1 [L]
 RewriteRule ^(.*\.php)$ $1 [L]
 
+RewriteRule ^login wp-login.php [L,R=302,QSA]
+
 RewriteCond %{REQUEST_URI} !^/server-info
 RewriteCond %{REQUEST_URI} !^/server-status
 RewriteCond %{REQUEST_URI} !^/cosign/valid

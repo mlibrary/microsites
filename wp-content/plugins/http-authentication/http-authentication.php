@@ -155,6 +155,8 @@ p#http-authentication-link a {
 		}
 		else {
 			// REMOTE_USER is invalid; now what?
+			wp_redirect(wp_login_url());
+			exit;
 
 			if (! $this->allow_wp_auth()) {
 				// Bail with the WP_Error when not falling back to WordPress authentication
