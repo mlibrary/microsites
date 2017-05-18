@@ -155,7 +155,7 @@ p#http-authentication-link a {
 		}
 		else {
 			// REMOTE_USER is invalid; now what?
-			wp_redirect(wp_login_url());
+			wp_redirect($this->_generate_uri($this->options['login_uri'], wp_login_url()));
 			exit;
 
 			if (! $this->allow_wp_auth()) {
