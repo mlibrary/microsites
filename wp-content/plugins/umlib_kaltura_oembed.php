@@ -9,5 +9,5 @@
 */
 add_action( 'init', 'umlib_kaltura_add_oembed_handlers');
 function umlib_kaltura_add_oembed_handlers() {
-    wp_oembed_add_provider( 'https://lib.mivideo.it.umich.edu/id/*', 'https://lib.mivideo.it.umich.edu/oembed/', false );
+    wp_oembed_add_provider( 'https://lib.mivideo.it.umich.edu/*', 'https://lib.mivideo.it.umich.edu/oembed', false );
 }
