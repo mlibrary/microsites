@@ -1,6 +1,6 @@
 <?php
 /*
-	Plugin Name: U-M Library setup.
+	Plugin Name: U-M Library Setup
 	Plugin URI: https://github.com/mlibrary/microsites
 	Description: Provide some basic setup for U-M Library sites.
 	Version: 1.0
