@@ -12,10 +12,43 @@ Text Domain: mlibrary-twentyseventeen
 Tags: one-column, two-columns, right-sidebar, flexible-header, accessibility-ready, custom-colors, custom-header, custom-menu, custom-logo, editor-style, featured-images, footer-widgets, post-formats, rtl-language-support, sticky-post, theme-options, threaded-comments, translation-ready
 */
 
+/* force full width */
+
+@media screen and (min-width: 48em) {
+
+.wrap, .navigation-top .wrap {
+max-width: none;
+}
+
+#content .wrap #primary .entry-content {
+width: 100%;
+}
+
+#content .wrap #primary .entry-header {
+width: 100%;
+}
+}
+
 .site-header {
 	background-color: #00274c;
 }
 
 .site-title a {
 	color: #fff;
+}
+
+.site-description {
+	color: #ccc;
+}
+
+.page .panel-content h2.entry-title {
+	font-size: 24px;
+}
+
+ul {
+	margin-left: 1.5em;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	padding-top: 0;
 }
