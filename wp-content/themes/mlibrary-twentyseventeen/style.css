@@ -17,7 +17,7 @@ Tags: one-column, two-columns, right-sidebar, flexible-header, accessibility-rea
 @media screen and (min-width: 48em) {
 
 .wrap, .navigation-top .wrap {
-max-width: none;
+max-width: none !important;
 }
 
 #content .wrap #primary .entry-content {
@@ -29,12 +29,25 @@ width: 100%;
 }
 }
 
+.entry-title {
+font-size: 24px !important;
+font-size: 1.5rem !important;
+}
+
+.entry-header {
+margin-bottom: 1em !important;
+}
+
 .site-header {
 	background-color: #00274c;
 }
 
 .site-title a {
 	color: #fff;
+}
+
+.site-content {
+padding-top: 2.5em !important;
 }
 
 .site-description {
