@@ -339,6 +339,9 @@ nav {
   padding-top: 1rem;
   padding-bottom: 0.65rem; }
 
+img .site-logo {
+  padding-right: 5px; }
+
 .site-brand,
 .site-brand:hover {
   box-shadow: none !important;
@@ -383,6 +386,9 @@ footer {
   padding: 2rem 0;
   margin-top: 3rem; }
 
+.site-info {
+  padding: 5px; }
+
 .entry-footer {
   background: transparent; }
 
@@ -394,7 +400,10 @@ footer {
 .no-margin {
   margin: 0; }
 
-.site-title a, .white-text {
+.site-title a {
+  color: white; }
+
+.white-text {
   color: white; }
 
 .left {

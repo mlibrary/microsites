@@ -11,6 +11,6 @@
 ?>
 <div class="site-info">
 <div class="wrap">
-Powered by <a href="https://www.lib.umich.edu">MLibrary</a>
+<a alt="MLibrary" href="https://www.lib.umich.edu"><img src="<?php bloginfo('stylesheet_directory'); ?>/logo-wide.png"></a>
 </div><!-- .wrap -->
 </div><!-- .site-info -->

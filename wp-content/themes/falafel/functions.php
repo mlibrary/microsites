@@ -88,6 +88,8 @@ add_action( 'after_setup_theme', 'falafel_content_width', 0 );
  *
  * @link https://developer.wordpress.org/themes/functionality/sidebars/#registering-a-sidebar
  */
+
+/* Remove sidebar
 function falafel_widgets_init() {
 	register_sidebar( array(
 		'name'          => esc_html__( 'Sidebar', 'falafel' ),
@@ -100,6 +102,7 @@ function falafel_widgets_init() {
 	) );
 }
 add_action( 'widgets_init', 'falafel_widgets_init' );
+*/
 
 /**
  * Enqueue scripts and styles.

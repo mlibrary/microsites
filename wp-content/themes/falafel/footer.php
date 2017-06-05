@@ -15,7 +15,7 @@
 
 	<footer id="colophon" class="site-footer container-fluid" role="contentinfo">
 		<div class="site-info right small white-text">
-			<a class="white-text" href="<?php echo esc_url( __( 'https://www.lib.umich.edu/', 'falafel' ) ); ?>"><?php printf( esc_html__( 'Powered by %s', 'falafel' ), 'MLibrary' ); ?></a>
+			<a class="white-text" href="https://www.lib.umich.edu/"><img src="<?php bloginfo('stylesheet_directory'); ?>/logo-wide.png"></a>
 		</div><!-- .site-info -->
 	</footer><!-- #colophon -->
 </div><!-- #page -->

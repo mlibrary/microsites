@@ -25,7 +25,10 @@
 
 	<header id="masthead" class="site-header" role="banner">
 		<div class="container-fluid">
-			<div class="site-title left"><a href="<?php echo esc_url( home_url( '/' ) ); ?>" rel="home"><?php bloginfo( 'name' ); ?></a></div>
+			<img src="<?php header_image(); ?>" class="site-logo left">
+			<div class="site-title left">
+				<span class="site-heading"><a href="<?php echo esc_url( home_url( '/' ) ); ?>" rel="home"><?php bloginfo( 'name' ); ?></a></span><span class="white-text"><?php bloginfo( 'description'); ?></span>
+			</div>
 		<nav id="site-navigation" class="navigation right" role="navigation"> <!-- change from .main-navigation -->
 			<button class="menu-toggle" aria-controls="primary-menu" aria-expanded="false"><?php esc_html_e( 'Primary Menu', 'falafel' ); ?></button>
 			<?php wp_nav_menu( array( 'theme_location' => 'menu-1', 'menu_id' => 'primary-menu' ) ); ?>
