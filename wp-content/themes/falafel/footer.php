@@ -14,9 +14,10 @@
 	</div><!-- #content -->
 
 	<footer id="colophon" class="site-footer container-fluid" role="contentinfo">
-		<div class="site-info right small white-text">
-			<a class="white-text" href="https://www.lib.umich.edu/"><img src="<?php bloginfo('stylesheet_directory'); ?>/logo-wide.png"></a>
-		</div><!-- .site-info -->
+		<div class="site-info container footer-container">
+			<span><img src="<?php bloginfo('stylesheet_directory'); ?>/umich_block_m.png" class="footer-logo-image"></span>
+			<p class="footer-text">Powered by the U-M Library</p>
+		</div>
 	</footer><!-- #colophon -->
 </div><!-- #page -->
 

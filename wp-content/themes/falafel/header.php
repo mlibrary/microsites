@@ -24,15 +24,19 @@
 	<a class="skip-link screen-reader-text" href="#content"><?php esc_html_e( 'Skip to content', 'falafel' ); ?></a>
 
 	<header id="masthead" class="site-header" role="banner">
-		<div class="container-fluid">
-			<img src="<?php header_image(); ?>" class="site-logo left">
-			<div class="site-title left">
-				<span class="site-heading"><a href="<?php echo esc_url( home_url( '/' ) ); ?>" rel="home"><?php bloginfo( 'name' ); ?></a></span><span class="white-text"><?php bloginfo( 'description'); ?></span>
+		<div class="header-alt">
+			<div class="header-container-alt">
+				<a href="<?php echo esc_url( home_url( '/' ) ); ?>" rel="home"><img src="<?php header_image(); ?>" class="header-logo-image-alt"></a>
+				<div class="header-title-container-alt">
+					<h1 class="header-alt-title"><?php bloginfo( 'name' ); ?></h1>
+					<p class="header-alt-subtitle"><?php bloginfo( 'description' ); ?></p>
+				</div>
 			</div>
-		<nav id="site-navigation" class="navigation right" role="navigation"> <!-- change from .main-navigation -->
+		</div>
+		<nav id="site-navigation" class="header-navigation-alt" role="navigation">
 			<button class="menu-toggle" aria-controls="primary-menu" aria-expanded="false"><?php esc_html_e( 'Primary Menu', 'falafel' ); ?></button>
-			<?php wp_nav_menu( array( 'theme_location' => 'menu-1', 'menu_id' => 'primary-menu' ) ); ?>
-		</nav><!-- #site-navigation -->
+			<?php wp_nav_menu( array( 'theme_location' => 'menu-1', 'menu_id' => 'primary-menu', 'menu_class' => 'header-navigation-list-alt' ) ); ?>
+		</nav>
 		</div>
 	</header><!-- #masthead -->
 
