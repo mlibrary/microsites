@@ -13,9 +13,11 @@
 
 	</div><!-- #content -->
 
-	<footer id="colophon" class="site-footer container-fluid" role="contentinfo">
-		<div class="site-info container footer-container">
-			<span><img src="<?php bloginfo('stylesheet_directory'); ?>/umich_block_m.png" class="footer-logo-image"></span>
+	<footer id="colophon" class="site-footer" role="contentinfo">
+		<div class="site-info container-fluid footer-container">
+			<span>
+				<img src="<?php bloginfo('stylesheet_directory'); ?>/umich_block_m.png" class="footer-logo-image" alt="The University of Michigan Block M">
+			</span>
 			<p class="footer-text">Powered by the U-M Library</p>
 		</div>
 	</footer><!-- #colophon -->

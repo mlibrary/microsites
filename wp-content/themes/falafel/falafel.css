@@ -59,7 +59,12 @@ html {
   padding: 0 1rem; }
 
 .container-fluid {
-  padding: 0 1rem; }
+  margin: 0 auto;
+  padding: 0 10vw;
+  max-width: 120rem; }
+  @media (max-width: 52rem) {
+    .container-fluid {
+      padding: 0 1rem; } }
 
 .container-max-width {
   max-width: 88rem; }
@@ -77,29 +82,29 @@ body {
   Headings
 */
 h1 {
-  font-size: 2.75rem; }
+  font-size: 2rem; }
 
 h2 {
-  font-size: 2rem; }
+  font-size: 1.5rem; }
 
 h1, h2 {
   font-weight: 700;
   line-height: 1.3; }
 
 h3 {
-  font-size: 1.75rem; }
+  font-size: 1.5rem; }
 
 h4 {
-  font-size: 1.5rem; }
+  font-size: 1.25rem; }
 
 h3, h4 {
   font-weight: 400; }
 
 h5 {
-  font-size: 1.5rem; }
+  font-size: 1.25rem; }
 
 h6 {
-  font-size: 1.25rem; }
+  font-size: 1.15rem; }
 
 h5, h6 {
   font-weight: 300; }
@@ -115,7 +120,6 @@ p {
 
 a {
   color: #126DC1;
-  text-decoration: none;
   cursor: pointer; }
 
 a:hover {
@@ -137,7 +141,7 @@ ul {
 
 li {
   padding-left: 1rem;
-  margin-top: 1rem; }
+  margin-top: 0.5rem; }
 
 dl {
   margin-top: 1rem;
@@ -171,9 +175,12 @@ th {
   text-align: left;
   color: #6E6E6E; }
 
+strong, b {
+  font-weight: 700; }
+
 blockquote {
   font-family: "PT Serif", serif;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   padding-left: 1.5rem;
   border-left: solid 0.5rem #126DC1;
   margin: 2rem 0;
@@ -429,7 +436,7 @@ textarea {
 */
 .header-alt {
   background: #00274C;
-  padding: 1rem; }
+  padding: 1rem 0; }
 
 .header-logo-image-alt {
   max-height: 3rem;
@@ -459,12 +466,12 @@ textarea {
   font-weight: 300; }
 
 .header-navigation-alt {
-  background: #E6F3FF; }
+  background: #E6F3FF;
+  margin-bottom: 1.5rem; }
 
 .header-navigation-list-alt {
   margin: 0;
-  padding: 0;
-  padding-left: 0.5rem;
+  padding: 0.5rem 0;
   list-style: none; }
   .header-navigation-list-alt > li {
     margin: 0;
@@ -472,13 +479,17 @@ textarea {
     display: inline-block; }
     .header-navigation-list-alt > li > a {
       display: inline-block;
-      padding: 1rem 0.5rem;
+      padding-right: 1rem;
+      padding-top: 0.5rem;
+      padding-bottom: 0.5rem;
       text-decoration: underline;
       line-height: 1; }
+    .header-navigation-list-alt > li:first-child > a {
+      padding-left: 0; }
 
-footer {
+.site-footer {
   background: #00274C;
-  padding: 2rem 0;
+  padding: 1.5rem 0;
   margin-top: 3rem; }
 
 .footer-container {
@@ -486,8 +497,9 @@ footer {
   align-items: center; }
 
 .footer-logo-image {
-  max-width: 4rem;
-  margin-right: 1rem; }
+  max-width: 3rem;
+  margin-right: 1rem;
+  vertical-align: top; }
 
 .footer-text {
   margin: 0;
@@ -526,13 +538,3 @@ footer {
   display: block; }
 
 /* close commented backslash hack */
-
-/* WordPress Custom Styles */
-
-.entry-footer {
-  background-color: transparent; 
-  padding: 0;
-  margin: 1rem; }
-
-.footer-container {
-margin: 2rem auto; }
