@@ -14,28 +14,24 @@ Tags: one-column, two-columns, right-sidebar, flexible-header, accessibility-rea
 
 /* force full width */
 
-@media screen and (min-width: 48em) {
-
 .wrap, .navigation-top .wrap {
-max-width: none !important;
+	padding: 0 1.5rem;
 }
 
-#content .wrap #primary .entry-content {
-width: 100%;
-}
-
-#content .wrap #primary .entry-header {
-width: 100%;
-}
+@media screen and (min-width: 52em) {
+	.wrap, .navigation-top .wrap {
+		max-width: 120rem;
+		padding: 0 10vw;
+	}
 }
 
 .entry-title {
-font-size: 24px !important;
-font-size: 1.5rem !important;
+	font-size: 24px !important;
+	font-size: 1.5rem !important;
 }
 
 .entry-header {
-margin-bottom: 1em !important;
+	margin-bottom: 1em !important;
 }
 
 .site-header {

@@ -88,6 +88,8 @@ add_action( 'after_setup_theme', 'falafel_content_width', 0 );
  *
  * @link https://developer.wordpress.org/themes/functionality/sidebars/#registering-a-sidebar
  */
+
+/* Remove sidebar
 function falafel_widgets_init() {
 	register_sidebar( array(
 		'name'          => esc_html__( 'Sidebar', 'falafel' ),
@@ -100,6 +102,27 @@ function falafel_widgets_init() {
 	) );
 }
 add_action( 'widgets_init', 'falafel_widgets_init' );
+*/
+
+/**
+ * Footer widget.
+ */
+function footer_widget_setup() {
+	register_sidebar(
+		array(
+			'name'          => 'Footer',
+			'id'            => 'footer_widget',
+			'class'         => 'footer_widget',
+			'description'   => 'For adding custom footer content.',
+			'before_widget' => '<div id="%1$s" class="footer-widget-container %2$s">',
+			'after_widget'  => '</div>',
+			'before_title'  => '<h2 class="footer-widget-title">',
+			'after_title'   => '</h2>',
+		)
+	);
+}
+
+add_action('widgets_init', 'footer_widget_setup');
 
 /**
  * Enqueue scripts and styles.
