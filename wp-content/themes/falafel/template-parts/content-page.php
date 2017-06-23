@@ -26,8 +26,7 @@
 	</div><!-- .entry-content -->
 
 	<?php if ( get_edit_post_link() ) : ?>
-		<footer class="entry-footer">
-			<?php
+		<footer class="entry-footer"><?php
 				edit_post_link(
 					sprintf(
 						/* translators: %s: Name of current post */
@@ -37,7 +36,6 @@
 					'<span class="edit-link">',
 					'</span>'
 				);
-			?>
-		</footer><!-- .entry-footer -->
+			?></footer><!-- .entry-footer -->
 	<?php endif; ?>
 </article><!-- #post-## -->

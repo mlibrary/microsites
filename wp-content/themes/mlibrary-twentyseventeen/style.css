@@ -25,9 +25,23 @@ Tags: one-column, two-columns, right-sidebar, flexible-header, accessibility-rea
 	}
 }
 
+/*
+	Main theme overrides
+*/
+
+.entry-content,
+.entry-header,
+.single-post:not(.has-sidebar) #primary,
+.page.page-one-column:not(.twentyseventeen-front-page) #primary,
+.archive.page-one-column:not(.has-sidebar) .page-header,
+.archive.page-one-column:not(.has-sidebar) #primary {
+	width: 100% !important;
+	max-width: 100%;
+}
+
 article .panel-content .wrap {
-padding-top: 0;
-padding-bottom: 3em;
+	padding-top: 0;
+	padding-bottom: 3em;
 }
 
 .entry-title {
@@ -72,7 +86,11 @@ h1, h2, h3, h4, h5, h6 {
 .falafel-footer {
   background: #00274c;
   padding: 2rem 0;
-  margin-top: -3rem;
+	color: white;
+}
+
+.falafel-footer h2.widget-title {
+	color: white;
 }
 
 .footer-container {
