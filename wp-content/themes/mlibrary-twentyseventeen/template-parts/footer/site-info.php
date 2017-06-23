@@ -9,8 +9,12 @@
  */
 
 ?>
-<div class="site-info">
-<div class="wrap">
-Powered by <a href="https://www.lib.umich.edu">MLibrary</a>
-</div><!-- .wrap -->
-</div><!-- .site-info -->
+  </div>
+</footer>
+
+<footer class="falafel-footer">
+  <div class="wrap footer-container">
+    <span>
+      <img src="<?php bloginfo('stylesheet_directory'); ?>/umich_block_m.png" alt="The University of Michigan block M" class="footer-logo-image">
+    </span>
+    <p class="footer-text">Powered by the U-M Library</p>
