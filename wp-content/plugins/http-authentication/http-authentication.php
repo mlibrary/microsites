@@ -226,11 +226,21 @@ p#http-authentication-link a {
 		$password = wp_generate_password();
 		$email_domain = $this->options['auto_create_email_domain'];
 
-		$user_id = wp_create_user($username, $password, $username . ($email_domain ? '@' . $email_domain : ''));
+		$user_id = wp_create_user($username, $password, $this->email_address($username, $email_domain));
 		$user = get_user_by('id', $user_id);
 
 		return $user;
 	}
+
+        /**
+         * Assemble an email
+         */
+        private function email_address($username, $email_domain) {
+          if ($email_domain != '' && strpos($username, '@') === FALSE) {
+            return $username . '@' . $email_domain;
+          }
+          return $username;
+        }
 
 	/*
 	 * Fill the specified URI with the site URI and the specified return location.
