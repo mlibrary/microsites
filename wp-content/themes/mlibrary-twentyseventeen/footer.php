@@ -36,10 +36,7 @@
 				<?php endif; ?>
 
         <div class="footer-container">
-          <span>
-            <img src="<?php bloginfo('stylesheet_directory'); ?>/umich_block_m.png" alt="The University of Michigan block M" class="footer-logo-image">
-          </span>
-          <p class="footer-text">Powered by the U-M Library</p>
+          <p class="footer-text">Powered by the University of Michigan Library</p>
         </div>
 			</div><!-- .wrap -->
 		</footer><!-- #colophon -->

@@ -16,10 +16,7 @@
 	<footer id="colophon" class="site-footer" role="contentinfo">
 		<div class="site-info container-fluid footer-container">
 			<div class="flex flex-center">
-				<span>
-					<img src="<?php bloginfo('stylesheet_directory'); ?>/umich_block_m.png" class="footer-logo-image" alt="The University of Michigan Block M">
-				</span>
-				<p class="footer-text">Powered by the U-M Library</p>
+				<p class="footer-text">Powered by the University of Michigan Library</p>
 			</div>
 
 			<?php dynamic_sidebar('footer_widget'); ?>
