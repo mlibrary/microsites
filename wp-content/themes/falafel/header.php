@@ -33,7 +33,7 @@
 						<?php } ?>
 					</a>
 					<div class="header-title-container-alt">
-						<h1 class="header-alt-title"><?php bloginfo( 'name' ); ?></h1>
+						<span class="header-alt-title"><?php bloginfo( 'name' ); ?></span>
 						<p class="header-alt-subtitle"><?php bloginfo( 'description' ); ?></p>
 					</div>
 				</div>
