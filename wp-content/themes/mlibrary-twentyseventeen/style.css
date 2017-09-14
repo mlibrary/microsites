@@ -93,6 +93,15 @@ h1, h2, h3, h4, h5, h6 {
 	color: white;
 }
 
+.falafel-footer a {
+   color: white;
+   text-decoration: underline;
+}
+
+.falafel-footer a:hover {
+  text-decoration: underline; }
+}
+
 .falafel-footer h2.widget-title {
 	color: white;
 }
