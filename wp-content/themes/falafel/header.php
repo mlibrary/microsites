@@ -33,7 +33,7 @@
 						<?php } ?>
 					</a>
 					<div class="header-title-container-alt">
-						<span class="header-alt-title"><?php bloginfo( 'name' ); ?></span>
+						<span class="header-alt-title"><a href="<?php echo esc_url( home_url( '/' ) ); ?>" rel="home"><?php bloginfo( 'name' ); ?></a></span>
 						<p class="header-alt-subtitle"><?php bloginfo( 'description' ); ?></p>
 					</div>
 				</div>

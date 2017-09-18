@@ -459,6 +459,16 @@ textarea {
   font-weight: 600;
   color: white; }
 
+  .header-alt-title > a {
+    color: white;
+    text-decoration: none;
+  }
+
+  .header-alt-title > a:hover {
+    color: white;
+    text-decoration: underline;
+  }
+
 .header-alt-subtitle {
   margin: 0;
   line-height: 1.4;

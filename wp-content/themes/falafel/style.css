@@ -814,10 +814,6 @@ object {
 /*--------------------------------------------------------------
 ## Galleries
 --------------------------------------------------------------*/
-img {
-	max-width: 100%
-	padding: 0 .25em !important;
-}
 
 .gallery {
 	margin-bottom: 1.5em;
@@ -903,6 +899,15 @@ img {
 
 .footer-container {
 	justify-content: space-between;
+}
+
+.site-footer a {
+	color: white;
+	text-decoration: underline;
+}
+.site-footer a:hover {
+	color: white;
+	text-decoration: underline;
 }
 
 @media (max-width: 80em) {

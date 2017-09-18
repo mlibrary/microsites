@@ -36,7 +36,7 @@
 				<?php endif; ?>
 
         <div class="footer-container">
-          <p class="footer-text">Powered by the University of Michigan Library</p>
+          <p class="footer-text">Powered by the <a href="https://www.lib.umich.edu/">University of Michigan Library</a></p>
         </div>
 			</div><!-- .wrap -->
 		</footer><!-- #colophon -->
