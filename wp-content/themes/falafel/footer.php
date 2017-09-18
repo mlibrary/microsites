@@ -16,7 +16,7 @@
 	<footer id="colophon" class="site-footer" role="contentinfo">
 		<div class="site-info container-fluid footer-container">
 			<div class="flex flex-center">
-				<p class="footer-text">Powered by the University of Michigan Library</p>
+				<p class="footer-text">Powered by the <a href="https://www.lib.umich.edu/">University of Michigan Library</a></p>
 			</div>
 
 			<?php dynamic_sidebar('footer_widget'); ?>
