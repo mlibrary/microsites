@@ -52,10 +52,13 @@ function umlib_gist_shortcode($atts) {
         $data = reset($data);
       }
       $name = esc_html($data->filename);
-      $code = esc_html($data->content);
+      $gist = esc_html($data->content);
       $raw  = esc_html($data->raw_url);
     }
   }
-  return "<div><pre>{$code}</pre><a href=\"{$url}\">GitHub Gist: {$name}</a></div>";
+  if (empty($gist)) {
+    return '';
+  }
+  return "<figure><pre class='gist'><code>{$gist}</code></pre><figcaption><a href='{$url}'>GitHub Gist: {$name}</a></figcaption></figure>";
 }
 add_shortcode('gist', 'umlib_gist_shortcode');
