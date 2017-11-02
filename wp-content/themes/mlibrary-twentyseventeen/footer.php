@@ -17,7 +17,8 @@
 		</div><!-- #content -->
 
 		<footer id="colophon" class="falafel-footer">
-			<div class="wrap">
+			<div class="footer-container wrap">
+				<p class="footer-text">Powered by the <a href="https://www.lib.umich.edu/">University of Michigan Library</a></p>
 				<?php
 				get_template_part( 'template-parts/footer/footer', 'widgets' );
 
@@ -34,11 +35,8 @@
 						?>
 					</nav><!-- .social-navigation -->
 				<?php endif; ?>
-
-        <div class="footer-container">
-          <p class="footer-text">Powered by the <a href="https://www.lib.umich.edu/">University of Michigan Library</a></p>
-        </div>
-			</div><!-- .wrap -->
+				</div>
+			</div><!-- .footer-container-->
 		</footer><!-- #colophon -->
 	</div><!-- .site-content-contain -->
 </div><!-- #page -->
