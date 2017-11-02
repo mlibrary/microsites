@@ -121,8 +121,13 @@ h1, h2, h3, h4, h5, h6 {
   color: white;
 }
 
+/**
+ * Additional styling for the gist embed.
+ */
+.gist {
+  margin-bottom: .25em;
+}
 /** Media Queries **/
-
 
 @media screen and (max-width: 52em) {
 	.footer-container {
