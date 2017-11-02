@@ -35,7 +35,6 @@
 						?>
 					</nav><!-- .social-navigation -->
 				<?php endif; ?>
-				</div>
 			</div><!-- .footer-container-->
 		</footer><!-- #colophon -->
 	</div><!-- .site-content-contain -->
