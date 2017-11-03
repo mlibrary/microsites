@@ -1525,12 +1525,6 @@ body {
 	padding-right: 2em;
 }
 
-.wrap:after {
-	clear: both;
-	content: "";
-	display: block;
-}
-
 /*--------------------------------------------------------------
 13.1 Header
 --------------------------------------------------------------*/
@@ -2494,7 +2488,7 @@ body:not(.twentyseventeen-front-page) .entry-header {
 }
 
 .widget {
-	padding-bottom: 3em;
+	padding: .25em 1em;
 }
 
 h2.widget-title {
