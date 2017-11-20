@@ -2,6 +2,10 @@ RewriteEngine On
 RewriteBase /
 RewriteRule ^index\.php$ - [L]
 
+php_value upload_max_filesize 64M
+php_value post_max_size       64M
+php_value max_input_time      300
+
 # add a trailing slash to /wp-admin
 RewriteRule ^wp-admin$ wp-admin/ [R=301,L]
 
