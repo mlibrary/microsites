@@ -556,7 +556,7 @@ if (!class_exists('mk_file_folder_manager')):
             add_menu_page(
             __('WP File Manager', 'wp-file-manager'),
             __('WP File Manager', 'wp-file-manager'),
-            'manage_options',
+            'upload_files',
             'wp_file_manager',
             array(&$this, 'ffm_settings_callback'),
             plugins_url('images/wp_file_manager.png', __FILE__)
@@ -762,7 +762,7 @@ if (!class_exists('mk_file_folder_manager')):
         */
         public function permissions()
         {
-            $permissions = 'manage_options';
+            $permissions = 'upload_files';
 
             return $permissions;
         }
