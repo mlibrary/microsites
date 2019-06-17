@@ -9,6 +9,18 @@ php_value max_input_time      300
 # add a trailing slash to /wp-admin
 RewriteRule ^wp-admin$ wp-admin/ [R=301,L]
 
+RewriteCond %{HTTP_HOST} ^sites.lib.umich.edu$
+RewriteCond %{REQUEST_URI} ^/tcp/(docs.*)$
+RewriteCond %{DOCUMENT_ROOT}/wp-content/uploads/sites/11/%1 -f [OR]
+RewriteCond %{DOCUMENT_ROOT}/wp-content/uploads/sites/11/%1 -d
+RewriteRule . wp-content/uploads/sites/11/%1 [L]
+
+RewriteCond %{HTTP_HOST} ^sites.lib.umich.edu$
+RewriteCond %{REQUEST_URI} ^/docs
+RewriteCond %{DOCUMENT_ROOT}/wp-content/uploads/sites/11%{REQUEST_URI} -f [OR]
+RewriteCond %{DOCUMENT_ROOT}/wp-content/uploads/sites/11%{REQUEST_URI} -d
+RewriteRule . wp-content/uploads/sites/11%{REQUEST_URI} [L]
+
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
@@ -17,7 +29,11 @@ RewriteRule ^([_0-9a-zA-Z-]+/)?(wp-(content|admin|includes).*) $2 [L]
 RewriteRule ^([_0-9a-zA-Z-]+/)?(.*\.php)$ $2 [L]
 RewriteRule ^(.*\.php)$ $1 [L]
 
+RewriteCond %{HTTP_HOST} ^future-spaces.lib.umich.edu$
+RewriteRule ^login / [L,R=302,QSA]
+
 RewriteRule ^login wp-login.php [L,R=302,QSA]
+
 
 RewriteCond %{REQUEST_URI} !^/server-info
 RewriteCond %{REQUEST_URI} !^/server-status
