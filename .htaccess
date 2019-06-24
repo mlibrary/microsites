@@ -9,17 +9,21 @@ php_value max_input_time      300
 # add a trailing slash to /wp-admin
 RewriteRule ^wp-admin$ wp-admin/ [R=301,L]
 
+# Redirect to directories in tcp/docs early so that the url doesn't end up with wp-content/uploads in it.
+RewriteCond %{HTTP_HOST} ^sites.lib.umich.edu$
+RewriteCond %{REQUEST_URI} .*[^/]$
+RewriteCond %{DOCUMENT_ROOT}/wp-content/uploads/sites/11/$1 -d
+RewriteRule ^tcp/(docs.*)$ tcp/$1/ [R=302,L]
+
+# Rewrite the url here so that WP-managed content is used.
+RewriteCond %{HTTP_HOST} ^sites.lib.umich.edu$
+RewriteRule ^tcp/docs/(index.html)?$ tcp/about-the-tcp/historical-documentation/tcp-production-files/ [R=302,L]
+
 RewriteCond %{HTTP_HOST} ^sites.lib.umich.edu$
 RewriteCond %{REQUEST_URI} ^/tcp/(docs.*)$
 RewriteCond %{DOCUMENT_ROOT}/wp-content/uploads/sites/11/%1 -f [OR]
 RewriteCond %{DOCUMENT_ROOT}/wp-content/uploads/sites/11/%1 -d
 RewriteRule . wp-content/uploads/sites/11/%1 [L]
-
-RewriteCond %{HTTP_HOST} ^sites.lib.umich.edu$
-RewriteCond %{REQUEST_URI} ^/docs
-RewriteCond %{DOCUMENT_ROOT}/wp-content/uploads/sites/11%{REQUEST_URI} -f [OR]
-RewriteCond %{DOCUMENT_ROOT}/wp-content/uploads/sites/11%{REQUEST_URI} -d
-RewriteRule . wp-content/uploads/sites/11%{REQUEST_URI} [L]
 
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
