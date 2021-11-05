@@ -1,5 +1,4 @@
 /wp-content/uploads
-/wp-config.php
 *.swp
 *.swo
 *~
@@ -7,3 +6,6 @@
 *.zip
 *.tar.gz
 .DS_Store
+/.env
+/.bash_history
+/.php_history

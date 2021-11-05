@@ -1,0 +1,37 @@
+version: "3.9"
+    
+services:
+  db:
+    build:
+      context: .
+      dockerfile: Dockerfile.db
+      args:
+        MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+        MYSQL_USER: ${MYSQL_USER}
+        MYSQL_DATABASE: ${MYSQL_DATABASE}
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: always
+    env_file:
+      - .env
+    
+  web:
+    depends_on:
+      - db
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        APACHE_DOCUMENT_ROOT: ${APACHE_DOCUMENT_ROOT}
+        DOCKER_UID: ${DOCKER_UID}
+        DOCKER_GID: ${DOCKER_GID}
+    env_file:
+      - .env
+    volumes:
+      - .:${APACHE_DOCUMENT_ROOT}
+    ports:
+      - "80:80"
+    restart: always
+
+volumes:
+  db_data: {}
