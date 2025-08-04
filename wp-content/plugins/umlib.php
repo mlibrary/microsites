@@ -90,3 +90,11 @@ add_action('rest_api_init', function() {
     'callback' => 'umlib_custom_route_sites'
   ]);
 });
+
+add_filter('monsterinsights_compatible_php_version', function($versions) {
+  return [
+    'required' => '5.5',
+    'warning' => '5.5',
+    'recommended' => '5.5',
+  ];
+});
