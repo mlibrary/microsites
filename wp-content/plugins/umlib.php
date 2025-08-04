@@ -62,3 +62,31 @@ function umlib_gist_shortcode($atts) {
   return "<figure><pre class='gist'><code>{$gist}</code></pre><figcaption><a href='{$url}'>GitHub Gist: {$name}</a></figcaption></figure>";
 }
 add_shortcode('gist', 'umlib_gist_shortcode');
+
+# This is a custom REST API route to get the sites on the network.
+# https://wordpress.stackexchange.com/a/356864
+function umlib_custom_route_sites() {
+  $args = array(
+    'public'    => 1, // I only want the sites marked Public
+    'archived'  => 0,
+    'mature'    => 0,
+    'spam'      => 0,
+    'deleted'   => 0,
+  );
+
+  $sites = get_sites( $args );
+  foreach ($sites as $site) {
+    $site->url = get_site_url($site->blog_id);
+    $site->name = get_blog_option($site->blog_id, 'blogname');
+    $site->description = get_blog_option($site->blog_id, 'blogdescription');
+    $site->created = date('Y-m-d H:i:s', strtotime($site->registered));
+  }
+  return $sites;
+}
+
+add_action('rest_api_init', function() {
+  register_rest_route('wp/v2', 'sites', [
+    'methods' => 'GET',
+    'callback' => 'umlib_custom_route_sites'
+  ]);
+});
