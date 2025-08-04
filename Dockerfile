@@ -48,4 +48,8 @@ COPY docker/web/auth_openidc.conf /etc/apache2/mods-enabled/auth_openidc.conf
 COPY docker/web/000-default.conf /etc/apache2/sites-available/000-default.conf
 COPY . /var/www/html
 
+RUN curl https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
+    > /usr/bin/wp && \
+    chmod +x /usr/bin/wp
+
 CMD ["apache2ctl", "-D", "FOREGROUND"]
