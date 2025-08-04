@@ -1,0 +1,48 @@
+#!/bin/bash
+
+# First figure out where we're being run from
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
+  DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+DIR="$(dirname "$( cd -P "$( dirname "$SOURCE" )" && pwd )")"
+
+if [ -e "$DIR/.env" ] ; then
+  source "$DIR/.env"
+fi
+
+DRY=-n
+if [ x"$1" = x"-C" ] ; then
+  DRY=""
+fi
+
+rsync \
+  -cglOprtvzi \
+  --delete \
+  $DRY \
+  --exclude=/README.md \
+  --exclude=/docker \
+  --exclude=/Dockerfile \
+  --exclude=/compose.yml \
+  --exclude=/bin \
+  --exclude=/.\* \
+  --exclude=/wp-config.php \
+  --exclude=/wp-content/uploads \
+  --exclude=/wp-content/plugins/wp-file-manager/lib/.quarantine/ \
+  --exclude=/wp-content/plugins/wp-file-manager/lib/files/.tmb/ \
+  --exclude=/wp-content/plugins/wp-file-manager/lib/files/.quarantine/ \
+  --exclude=/wp-content/plugins/wp-file-manager/lib/files/.trash/.tmb \
+  --exclude=\*.sql.gz \
+  --exclude=\*.sql \
+  --exclude=\*.zip \
+  --exclude=\*.swp \
+  --exclude=\*.swo \
+  --exclude=\*.pkcs12 \
+  --exclude=\*.p12 \
+  --exclude=\*.pem \
+  --exclude=\*.key \
+  "$DIR/" \
+  "$PROD_HOST":"$PROD_PATH"
