@@ -33,8 +33,7 @@ add_filter('wpmu_validate_user_signup', function($info) {
 function umlib_gist_shortcode($atts) {
 
   $id   = isset($atts['id']) ? $atts['id'] :
-          isset($atts[0]) ? explode('/', $atts[0])[4] :
-          NULL;
+          (isset($atts[0]) ? explode('/', $atts[0])[4] : NULL);
 
   $file = isset($atts['file']) ? $atts['file'] : NULL;
 
