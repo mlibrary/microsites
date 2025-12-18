@@ -18,7 +18,8 @@
 
 		<footer id="colophon" class="falafel-footer">
 			<div class="footer-container wrap">
-				<p class="footer-text">Powered by the <a href="https://www.lib.umich.edu/">University of Michigan Library</a></p>
+				<p class="footer-text">Powered by the <a href="https://www.lib.umich.edu/">University of Michigan Library</a>
+				&bull; <a href="https://sites.lib.umich.edu/microsites-accessibility-statement/">Microsites Accessibility</a></p>
 				<?php
 				get_template_part( 'template-parts/footer/footer', 'widgets' );
 
