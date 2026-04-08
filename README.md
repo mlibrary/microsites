@@ -62,4 +62,8 @@
     docker-compose exec web wp super-admin add $USER
     ```
 
-6.  ???
+6.  Version updates
+The quick way to do a version update.
+```
+docker-compose run --rm web wp --url=http://microsites.localho.st core update --minor --path=/var/www/html
+```
