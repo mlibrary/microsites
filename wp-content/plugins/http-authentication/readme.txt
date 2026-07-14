@@ -2,8 +2,8 @@
 Contributors: dwc
 Tags: authentication
 Requires at least: 3.1
-Tested up to: 3.4
-Stable tag: 4.5
+Tested up to: 6.5.2
+Stable tag: 4.6
 
 Use an external authentication source in WordPress.
 
@@ -13,11 +13,11 @@ The HTTP Authentication plugin allows you to use existing means of authenticatin
 
 To follow updates to this plugin, visit:
 
-http://danieltwc.com/
+https://danieltwc.com/
 
 For help with this version, visit:
 
-http://danieltwc.com/2011/http-authentication-4-0/
+https://danieltwc.com/2011/http-authentication-4-0/
 
 == Installation ==
 
@@ -28,11 +28,6 @@ http://danieltwc.com/2011/http-authentication-4-0/
 5. Logout.
 6. Protect `wp-login.php` and `wp-admin` using your external authentication (using, for example, `.htaccess` files).
 7. Try logging in as one of the users added in step 4.
-
-Note: This version works with WordPress 3.0 and above. Use the following for older versions of WordPress:
-
-* Wordpress 2.0: [Version 1.8](http://downloads.wordpress.org/plugin/http-authentication.1.8.zip)
-* Wordpress 2.5 through 2.9.x: [Version 2.4](http://downloads.wordpress.org/plugin/http-authentication.2.4.zip)
 
 == Frequently Asked Questions ==
 
@@ -135,6 +130,9 @@ This would be modified for each environment as appropriate.
 2. WordPress login form with external authentication link
 
 == Changelog ==
+
+= 4.6 =
+* Add PHP 7/8 compatibility by updating constructor to use __construct
 
 = 4.5 =
 * Avoid some PHP notices due to saving options (William Schneider)

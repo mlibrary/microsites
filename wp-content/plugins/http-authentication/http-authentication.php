@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: HTTP Authentication
-Version: 4.5
+Version: 4.6
 Plugin URI: http://danieltwc.com/2011/http-authentication-4-0/
 Description: Authenticate users using basic HTTP authentication (<code>REMOTE_USER</code>). This plugin assumes users are externally authenticated, as with <a href="http://www.gatorlink.ufl.edu/">GatorLink</a>.
 Author: Daniel Westermann-Clark
@@ -15,7 +15,7 @@ class HTTPAuthenticationPlugin {
 	var $option_name = 'http_authentication_options';
 	var $options;
 
-	function HTTPAuthenticationPlugin() {
+	function __construct() {
 		$this->options = get_option($this->option_name);
 
 		if (is_admin()) {

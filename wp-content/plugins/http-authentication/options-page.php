@@ -6,7 +6,7 @@ class HTTPAuthenticationOptionsPage {
 	var $options;
 	var $title;
 
-	function HTTPAuthenticationOptionsPage($plugin, $group, $page, $options, $title = 'HTTP Authentication') {
+	function __construct($plugin, $group, $page, $options, $title = 'HTTP Authentication') {
 		$this->plugin = $plugin;
 		$this->group = $group;
 		$this->page = $page;
