@@ -1,79 +1,102 @@
 <?php
+/*
+ * PublishPress Capabilities [Free]
+ * 
+ * Process update operations from the Capabilities screen
+ * 
+ */
+
 class CapsmanHandler
 {
 	var $cm;
 
-	function __construct( $manager_obj ) {
-		$this->cm = $manager_obj;
+	function __construct($manager_obj = false) {
+		if ($manager_obj) {
+			$this->cm = $manager_obj;
+		} else {
+			global $capsman;
+			$this->cm = $capsman;
+		}
+
+		require_once (dirname(CME_FILE) . '/includes/roles/roles-functions.php');
 	}
 	
-	function processAdminGeneral( $post ) {
-		global $wp_roles;
+	function processAdminGeneral() {
+		global $wpdb, $wp_roles;
 		
+		check_admin_referer('capsman-general-manager');
+		
+		if ( empty ($_POST['caps']) ) {
+		    $_POST['caps'] = array();
+		}
+
+		if (!empty($_REQUEST['page']) && ('pp-capabilities-settings' == $_REQUEST['page'])) {
+			do_action('publishpress-caps_process_update');
+			return;
+		}
+
 		// Create a new role.
-		if ( ! empty($post['CreateRole']) ) {
-			if ( $newrole = $this->createRole($post['create-name']) ) {
+		if ( ! empty($_POST['CreateRole']) ) {
+			if (!empty($_POST['create-name'])) {
+				$newrole = $this->createRole(sanitize_text_field($_POST['create-name']));
+			}
+
+			if (!empty($newrole)) {
 				ak_admin_notify(__('New role created.', 'capsman-enhanced'));
-				$this->cm->current = $newrole;
+				$this->cm->set_current_role($newrole);
 			} else {
-				if ( empty($post['create-name']) && ( ! defined('WPLANG') || ! WPLANG ) )
-					ak_admin_error( 'Error: No role name specified.', 'capsman-enhanced' );
+				if ( empty($_POST['create-name']) && in_array(get_locale(), ['en_EN', 'en_US']) )
+					ak_admin_error('Error: No role name specified.');
 				else
 					ak_admin_error(__('Error: Failed creating the new role.', 'capsman-enhanced'));
 			}
 
-		// Copy current role to a new one.
-		} elseif ( ! empty($post['CopyRole']) ) {
-			$current = get_role($post['current']);
-			if ( $newrole = $this->createRole($post['copy-name'], $current->capabilities) ) {
-				ak_admin_notify(__('New role created.', 'capsman-enhanced'));
-				$this->cm->current = $newrole;
-			} else {
-				if ( empty($post['copy-name']) && ( ! defined('WPLANG') || ! WPLANG ) )
-					ak_admin_error( 'Error: No role name specified.', 'capsman-enhanced' );
-				else
-					ak_admin_error(__('Error: Failed creating the new role.', 'capsman-enhanced'));
-			}
-
-		// Save role changes. Already saved at start with self::saveRoleCapabilities().
-		} elseif ( ! empty($post['SaveRole']) ) {
+		// Save role changes. Already saved at start with self::saveRoleCapabilities()
+		} elseif ( ! empty($_POST['SaveRole']) && !empty($_POST['current'])) {
 			if ( MULTISITE ) {
-				global $wp_roles;
-				//if ( method_exists( $wp_roles, 'reinit' ) )
-					//$wp_roles->reinit();
-				$wp_roles = new WP_Roles();
+				( method_exists( $wp_roles, 'for_site' ) ) ? $wp_roles->for_site() : $wp_roles->reinit();
 			}
 			
-			$this->saveRoleCapabilities($post['current'], $post['caps'], $post['level']);
+			if (!pp_capabilities_is_editable_role(sanitize_key($_POST['current']))) {
+				ak_admin_error(__('The selected role is not editable.', 'capsman-enhanced'));
+				return;
+			}
+
+			$level = (isset($_POST['level'])) ? (int) $_POST['level'] : 0;
+			$this->saveRoleCapabilities(sanitize_key($_POST['current']), array_map('boolval', $_POST['caps']), $level);
 			
-			if ( defined( 'PP_ACTIVE' ) ) {  // log customized role caps for subsequent restoration
+			if (defined( 'PRESSPERMIT_ACTIVE' ) && !empty($_POST['role'])) {  // log customized role caps for subsequent restoration
 				// for bbPress < 2.2, need to log customization of roles following bbPress activation
 				$plugins = ( function_exists( 'bbp_get_version' ) && version_compare( bbp_get_version(), '2.2', '<' ) ) ? array( 'bbpress.php' ) : array();	// back compat
 
 				if ( ! $customized_roles = get_option( 'pp_customized_roles' ) )
 					$customized_roles = array();
 				
-				$customized_roles[$post['role']] = (object) array( 'caps' => array_map( 'boolval', $post['caps'] ), 'plugins' => $plugins );
+				$_role = sanitize_key($_POST['role']);
+
+				$customized_roles[$_role] = (object) array( 'caps' => array_map( 'boolval', $_POST['caps'] ), 'plugins' => $plugins );
 				update_option( 'pp_customized_roles', $customized_roles );
 				
-				global $wpdb;
 				$wpdb->query( "UPDATE $wpdb->options SET autoload = 'no' WHERE option_name = 'pp_customized_roles'" );
 			}
 		// Create New Capability and adds it to current role.
-		} elseif ( ! empty($post['AddCap']) ) {
+		} elseif (!empty($_POST['AddCap']) && !empty($_POST['current']) && !empty($_POST['capability-name'])) {
 			if ( MULTISITE ) {
-				global $wp_roles;
-				//if ( method_exists( $wp_roles, 'reinit' ) )
-				//	$wp_roles->reinit();
-				$wp_roles = new WP_Roles();
+				( method_exists( $wp_roles, 'for_site' ) ) ? $wp_roles->for_site() : $wp_roles->reinit();
 			}
-			
-			$role = get_role($post['current']);
-			$role->name = $post['current'];		// bbPress workaround
 
-			if ( $newname = $this->createNewName($post['capability-name']) ) {
+			if (empty($_POST['current']) || !pp_capabilities_is_editable_role(sanitize_key($_POST['current']))) {
+				ak_admin_error(__('The selected role is not editable.', 'capsman-enhanced'));
+				return;
+			}
+
+			$role = get_role(sanitize_key($_POST['current']));
+			$role->name = sanitize_key($_POST['current']);		// bbPress workaround
+
+			$newname = $this->createNewName(sanitize_text_field($_POST['capability-name']), ['allow_dashes' => true]);
+
+			if (empty($newname['error'])) {
 				$role->add_cap($newname['name']);
-				$this->cm->message = __('New capability added to role.');
 
 				// for bbPress < 2.2, need to log customization of roles following bbPress activation
 				$plugins = ( function_exists( 'bbp_get_version' ) && version_compare( bbp_get_version(), '2.2', '<' ) ) ? array( 'bbpress.php' ) : array();	// back compat
@@ -81,31 +104,37 @@ class CapsmanHandler
 				if ( ! $customized_roles = get_option( 'pp_customized_roles' ) )
 					$customized_roles = array();
 
-				$customized_roles[$post['role']] = (object) array( 'caps' => array_merge( $role->capabilities, array( $newname['name'] => 1 ) ), 'plugins' => $plugins );
+				$customized_roles[sanitize_key($_POST['role'])] = (object) array( 'caps' => array_merge( $role->capabilities, array( $newname['name'] => 1 ) ), 'plugins' => $plugins );
 				update_option( 'pp_customized_roles', $customized_roles );
 				
-				global $wpdb;
 				$wpdb->query( "UPDATE $wpdb->options SET autoload = 'no' WHERE option_name = 'pp_customized_roles'" );
+
+				$redirect_role = (!empty($_POST['role'])) ? sanitize_key($_POST['role']) : '';
+
+				$url = admin_url('admin.php?page=pp-capabilities&role=' . esc_attr($redirect_role) . '&added=1');
+				wp_redirect($url);
+				exit;
 			} else {
-				$this->cm->message = __('Incorrect capability name.');
+				add_action('all_admin_notices', function() {
+					ak_admin_notify(__('Incorrect capability name.', 'capsman-enhanced'));
+				});
 			}
 			
-		} elseif ( ! empty($post['update_filtered_types']) ) {
-			if ( cme_update_pp_usage() ) {
-				ak_admin_notify(__('Capability settings saved.', 'capsman-enhanced'));
-			} else {
-				ak_admin_error(__('Error saving capability settings.', 'capsman-enhanced'));
-			}
+		} elseif ( ! empty($_POST['update_filtered_types']) || ! empty($_POST['update_filtered_taxonomies']) || ! empty($_POST['update_detailed_taxonomies']) ) {
+				ak_admin_notify(__('Type / Taxonomy settings saved.', 'capsman-enhanced'));
 		} else {
-		    // TODO: Implement exceptions. This must be a fatal error.
-		    ak_admin_error(__('Bad form received.', 'capsman-enhanced'));
+			if (!apply_filters('publishpress-caps_submission_ok', false)) {
+				ak_admin_error(__('Bad form received.', 'capsman-enhanced'));
+			}
 		}
 
-		if ( ! empty($newrole) && defined('PP_ACTIVE') ) {
-			if ( ( ! empty($post['CreateRole']) && ! empty( $_REQUEST['new_role_pp_only'] ) ) || ( ! empty($post['CopyRole']) && ! empty( $_REQUEST['copy_role_pp_only'] ) ) ) {
-				$pp_only = (array) pp_get_option( 'supplemental_role_defs' );
+		if ( ! empty($newrole) && defined('PRESSPERMIT_ACTIVE') ) {
+			if ( ( ! empty($_POST['CreateRole']) && ! empty( $_REQUEST['new_role_pp_only'] ) ) || ( ! empty($_POST['CopyRole']) && ! empty( $_REQUEST['copy_role_pp_only'] ) ) ) {
+				$pp_only = (array) pp_capabilities_get_permissions_option( 'supplemental_role_defs' );
 				$pp_only[]= $newrole;
-				pp_update_option( 'supplemental_role_defs', $pp_only );
+
+				pp_capabilities_update_permissions_option('supplemental_role_defs', $pp_only);
+				
 				_cme_pp_default_pattern_role( $newrole );
 				pp_refresh_options();
 			}
@@ -123,27 +152,34 @@ class CapsmanHandler
 	 * @param string $name	Name from user input.
 	 * @return array|false An array with the name and display_name, or false if not valid $name.
 	 */
-	private function createNewName( $name ) {
+	public function createNewName( $name, $args=[] ) {
 		// Allow max 40 characters, letters, digits and spaces
 		$name = trim(substr($name, 0, 40));
-		$pattern = '/^[a-zA-Z][a-zA-Z0-9 _]+$/';
+		$pattern = (!empty($args['allow_dashes'])) ? '/^[a-zA-Z][a-zA-Z0-9 _\-]+$/' : '/^[a-zA-Z][a-zA-Z0-9 _]+$/';
 
 		if ( preg_match($pattern, $name) ) {
 			$roles = ak_get_roles();
 
-			$name = strtolower($name);
 			$name = str_replace(' ', '_', $name);
 			if ( in_array($name, $roles) || array_key_exists($name, $this->cm->capabilities) ) {
-				return false;	// Already a role or capability with this name.
+				return ['error' => 'role_exists', 'name' => $name];		// Already a role or capability with this name.
 			}
 
 			$display = explode('_', $name);
-			$display = array_map('ucfirst', $display);
+			$name = strtolower($name);
+
+			// Apply ucfirst proper caps unless capitalization already provided
+			foreach($display as $i => $word) {
+				if ($word === strtolower($word)) {
+					$display[$i] = ucfirst($word);
+				}
+			}
+
 			$display = implode(' ', $display);
 
 			return compact('name', 'display');
 		} else {
-			return false;
+			return ['error' => 'invalid_name', 'name' => $name];
 		}
 	}
 
@@ -154,12 +190,12 @@ class CapsmanHandler
 	 * @param array $caps	Role capabilities.
 	 * @return string|false	Returns the name of the new role created or false if failed.
 	 */
-	private function createRole( $name, $caps = array() ) {
+	public function createRole( $name, $caps = [], $args = [] ) {
 		if ( ! is_array($caps) )
 			$caps = array();
 
 		$role = $this->createNewName($name);
-		if ( ! is_array($role) ) {
+		if (!empty($role['error'])) {
 			return false;
 		}
 
@@ -181,11 +217,12 @@ class CapsmanHandler
 	private function saveRoleCapabilities( $role_name, $caps, $level ) {
 		$this->cm->generateNames();
 		$role = get_role($role_name);
-		
+
 		// workaround to ensure db storage of customizations to bbp dynamic roles
 		$role->name = $role_name;
 		
 		$stored_role_caps = ( ! empty($role->capabilities) && is_array($role->capabilities) ) ? array_intersect( $role->capabilities, array(true, 1) ) : array();
+		$stored_negative_role_caps = ( ! empty($role->capabilities) && is_array($role->capabilities) ) ? array_intersect( $role->capabilities, array(false) ) : array();
 		
 		$old_caps = array_intersect_key( $stored_role_caps, $this->cm->capabilities);
 		$new_caps = ( is_array($caps) ) ? array_map('boolval', $caps) : array();
@@ -193,7 +230,7 @@ class CapsmanHandler
 
 		// Find caps to add and remove
 		$add_caps = array_diff_key($new_caps, $old_caps);
-		$del_caps = array_diff_key($old_caps, $new_caps);
+		$del_caps = array_diff_key(array_merge($old_caps, $stored_negative_role_caps), $new_caps);
 
 		$changed_caps = array();
 		foreach( array_intersect_key( $new_caps, $old_caps ) as $cap_name => $cap_val ) {
@@ -212,6 +249,12 @@ class CapsmanHandler
 			unset($del_caps['manage_capabilities']);
 			ak_admin_error(__('You cannot remove Manage Capabilities from Administrators', 'capsman-enhanced'));
 		}
+		
+		// additional safeguard against removal of read capability
+		if ( isset( $del_caps['read'] ) && _cme_is_read_removal_blocked( $role_name ) ) {
+			unset( $del_caps['read'] );
+		}
+		
 		// Add new capabilities to role
 		foreach ( $add_caps as $cap => $grant ) {
 			if ( $is_administrator || current_user_can($cap) )
@@ -224,7 +267,9 @@ class CapsmanHandler
 				$role->remove_cap($cap);
 		}
 		
-		if ( is_multisite() && is_super_admin() && ( 1 == get_current_blog_id() ) ) {
+		$this->cm->log_db_roles();
+		
+		if (is_multisite() && is_super_admin() && is_main_site()) {
 			if ( ! $autocreate_roles = get_site_option( 'cme_autocreate_roles' ) )
 				$autocreate_roles = array();
 			
@@ -240,127 +285,90 @@ class CapsmanHandler
 				update_site_option( 'cme_autocreate_roles', $autocreate_roles );
 			}
 			
-			if ( ! empty($_REQUEST['cme_net_sync_role']) ) {
+			$do_role_sync = !empty($_REQUEST['cme_net_sync_role']);
+			$do_option_sync = !empty($_REQUEST['cme_net_sync_options']);
+
+			if ($do_role_sync || $do_option_sync) {
 				// loop through all sites on network, creating or updating role def
 		
 				global $wpdb, $wp_roles, $blog_id;
 				$blog_ids = $wpdb->get_col( "SELECT blog_id FROM $wpdb->blogs ORDER BY blog_id" );
 				$orig_blog_id = $blog_id;	
 		
-				$role_caption = $wp_roles->role_names[$role_name];
-				
-				$new_caps = ( is_array($caps) ) ? array_map('boolval', $caps) : array();
-				$new_caps = array_merge($new_caps, ak_level2caps($level) );
-				
-				$admin_role = $wp_roles->get_role('administrator');
-				$main_admin_caps = array_merge( $admin_role->capabilities, ak_level2caps(10) );
+				if ($do_role_sync) {
+					$role_caption = $wp_roles->role_names[$role_name];
+					
+					$new_caps = ( is_array($caps) ) ? array_map('boolval', $caps) : array();
+					$new_caps = array_merge($new_caps, ak_level2caps($level) );
+					
+					$admin_role = $wp_roles->get_role('administrator');
+					$main_admin_caps = array_merge( $admin_role->capabilities, ak_level2caps(10) );
+				}
+
+				$sync_options = [];
+
+				if ($do_option_sync) {
+					// capability-related options
+					$pp_prefix = (defined('PPC_VERSION') && !defined('PRESSPERMIT_VERSION')) ? 'pp' : 'presspermit';
+
+					foreach(['define_create_posts_cap', 'enabled_post_types', 'enabled_taxonomies'] as $option_name) {
+						$sync_options["{$pp_prefix}_$option_name"] = get_option("{$pp_prefix}_$option_name");
+					}
+
+					$sync_options['cme_detailed_taxonomies'] = get_option('cme_detailed_taxonomies');
+					$sync_options['cme_enabled_post_types'] = get_option('cme_enabled_post_types');
+					$sync_options['presspermit_supplemental_role_defs'] = get_option('presspermit_supplemental_role_defs');
+				}
 
 				foreach ( $blog_ids as $id ) {				
-					if ( 1 == $id )
+					if ( is_main_site($id) )
 						continue;
 					
 					switch_to_blog( $id );
-					//$wp_roles->reinit();
-					$wp_roles = new WP_Roles();
-					
-					if ( $blog_role = $wp_roles->get_role( $role_name ) ) {
-						$stored_role_caps = ( ! empty($blog_role->capabilities) && is_array($blog_role->capabilities) ) ? array_intersect( $blog_role->capabilities, array(true, 1) ) : array();
-						
-						$old_caps = array_intersect_key( $stored_role_caps, $this->cm->capabilities);
 
-						// Find caps to add and remove
-						$add_caps = array_diff_key($new_caps, $old_caps);
-						$del_caps = array_intersect_key( array_diff_key($old_caps, $new_caps), $main_admin_caps );	// don't mess with caps that are totally unused on main site
+					if ($do_role_sync) {
+						( method_exists( $wp_roles, 'for_site' ) ) ? $wp_roles->for_site() : $wp_roles->reinit();
 						
-						// Add new capabilities to role
-						foreach ( $add_caps as $cap => $grant ) {
-							$blog_role->add_cap( $cap, $grant );
-						}
+						if ( $blog_role = $wp_roles->get_role( $role_name ) ) {
+							$stored_role_caps = ( ! empty($blog_role->capabilities) && is_array($blog_role->capabilities) ) ? array_intersect( $blog_role->capabilities, array(true, 1) ) : array();
+							
+							$old_caps = array_intersect_key( $stored_role_caps, $this->cm->capabilities);
 
-						// Remove capabilities from role
-						foreach ( $del_caps as $cap => $grant) {
-							$blog_role->remove_cap($cap);
+							// Find caps to add and remove
+							$add_caps = array_diff_key($new_caps, $old_caps);
+							$del_caps = array_intersect_key( array_diff_key($old_caps, $new_caps), $main_admin_caps );	// don't mess with caps that are totally unused on main site
+							
+							// Add new capabilities to role
+							foreach ( $add_caps as $cap => $grant ) {
+								$wp_roles->roles[$role_name]['capabilities'][$cap] = $grant;
+
+							}
+
+							// Remove capabilities from role
+							foreach ( $del_caps as $cap => $grant) {
+								unset($wp_roles->roles[$role_name]['capabilities'][$cap]);
+							}
+
+							if ($wp_roles->use_db) {
+								update_option($wp_roles->role_key, $wp_roles->roles);
+							}
+						} else {
+							$wp_roles->add_role( $role_name, $role_caption, $new_caps );
 						}
-						
-					} else {
-						$wp_roles->add_role( $role_name, $role_caption, $new_caps );
+					}
+
+					foreach($sync_options as $option_name => $option_val) {
+						update_option($option_name, $option_val);
 					}
 					
 					restore_current_blog();
 				}
 				
-				//$wp_roles->reinit();
-				$wp_roles = new WP_Roles();
+				( method_exists( $wp_roles, 'for_site' ) ) ? $wp_roles->for_site() : $wp_roles->reinit();
 			}
 		} // endif multisite installation with super admin editing a main site role
-	}
-	
 
-
-	/**
-	 * Deletes a role.
-	 * The role comes from the $_GET['role'] var and the nonce has already been checked.
-	 * Default WordPress role cannot be deleted and if trying to do it, throws an error.
-	 * Users with the deleted role, are moved to the WordPress default role.
-	 *
-	 * @return void
-	 */
-	function adminDeleteRole ()
-	{
-		global $wpdb, $wp_roles;
-
-		check_admin_referer('delete-role_' . $_GET['role']);
-		
-		$this->cm->current = $_GET['role'];
-		$default = get_option('default_role');
-		if (  $default == $this->cm->current ) {
-			ak_admin_error(sprintf(__('Cannot delete default role. You <a href="%s">have to change it first</a>.', 'capsman-enhanced'), 'options-general.php'));
-			return;
-		}
-
-		$query = "SELECT ID FROM {$wpdb->usermeta} INNER JOIN {$wpdb->users} "
-			. "ON {$wpdb->usermeta}.user_id = {$wpdb->users}.ID "
-			. "WHERE meta_key='{$wpdb->prefix}capabilities' AND meta_value LIKE '%{$this->cm->current}%';";
-
-		$users = $wpdb->get_results($query);
-
-		// Array of all roles except the one being deleted, for use below
-		$role_names = array_diff_key( array_keys( $wp_roles->role_names ), array( $this->cm->current => true ) );
-		
-		$count = 0;
-		foreach ( $users as $u ) {
-			$skip_role_set = false;
-		
-			$user = new WP_User($u->ID);
-			if ( $user->has_cap($this->cm->current) ) {		// Check again the user has the deleting role
-				
-				// Role may have been assigned supplementally.  Don't move a user to default role if they still have one or more roles following the deletion.
-				foreach( $role_names as $_role_name ) {
-					if ( $user->has_cap($_role_name) ) {
-						$skip_role_set = true;
-						break;
-					}
-				}
-				
-				if ( ! $skip_role_set ) {
-					$user->set_role($default);
-					$count++;
-				}
-			}
-		}
-
-		remove_role($this->cm->current);
-		unset($this->cm->roles[$this->cm->current]);
-
-		if ( $customized_roles = get_option( 'pp_customized_roles' ) ) {
-			if ( isset( $customized_roles[$this->cm->current] ) ) {
-				unset( $customized_roles[$this->cm->current] );
-				update_option( 'pp_customized_roles', $customized_roles );
-			}
-		}
-		
-		ak_admin_notify(sprintf(__('Role has been deleted. %1$d users moved to default role %2$s.', 'capsman-enhanced'), $count, $this->cm->roles[$default]));
-		$this->cm->current = $default;
+		pp_capabilities_autobackup();
 	}
 }
 
