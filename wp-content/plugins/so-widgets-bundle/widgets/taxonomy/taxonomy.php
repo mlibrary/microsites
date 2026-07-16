@@ -1,21 +1,20 @@
 <?php
-
 /*
 Widget Name: Taxonomy
-Description: Displays the selected taxonomy for the current post.
+Description: Automatically display the taxonomies of the current post with customizable labels, colors, and link settings.
 Author: SiteOrigin
 Author URI: https://siteorigin.com
+Documentation: https://siteorigin.com/widgets-bundle/taxonomy-widget/
 */
 
 class SiteOrigin_Widget_Taxonomy_Widget extends SiteOrigin_Widget {
-
-	function __construct() {
-
+	public function __construct() {
 		parent::__construct(
 			'sow-taxonomy',
 			__( 'SiteOrigin Taxonomy', 'so-widgets-bundle' ),
 			array(
-				'description' => __( 'A taxonomy widget.', 'so-widgets-bundle' )
+				'description' => __( 'Automatically display the taxonomies of the current post with customizable labels, colors, and link settings.', 'so-widgets-bundle' ),
+				'help' => 'https://siteorigin.com/widgets-bundle/taxonomy-widget/',
 			),
 			array(),
 			false,
@@ -23,7 +22,7 @@ class SiteOrigin_Widget_Taxonomy_Widget extends SiteOrigin_Widget {
 		);
 	}
 
-	function get_widget_form() {
+	public function get_widget_form() {
 		// Gets taxonomy objects and extracts the 'label' field from each one.
 		$taxonomies = wp_list_pluck( get_taxonomies( array(), 'objects' ), 'label' );
 
@@ -66,24 +65,25 @@ class SiteOrigin_Widget_Taxonomy_Widget extends SiteOrigin_Widget {
 		);
 	}
 
-	function get_less_variables( $instance ) {
+	public function get_less_variables( $instance ) {
+		if ( empty( $instance ) ) {
+			return array();
+		}
+
 		return array(
 			'color' => $instance['color'],
-			'has_color' => empty($instance['color']) ? 'false' : 'true',
+			'has_color' => empty( $instance['color'] ) ? 'false' : 'true',
 			'hover_color' => $instance['hover_color'],
-			'has_hover_color' => empty($instance['hover_color']) ? 'false' : 'true',
+			'has_hover_color' => empty( $instance['hover_color'] ) ? 'false' : 'true',
 		);
 	}
 
 	/**
 	 * Get the template variables for the taxonomy
 	 *
-	 * @param $instance
-	 * @param $args
-	 *
 	 * @return array
 	 */
-	function get_template_variables( $instance, $args ) {
+	public function get_template_variables( $instance, $args ) {
 		if ( empty( $instance ) ) {
 			return array();
 		}
@@ -97,5 +97,4 @@ class SiteOrigin_Widget_Taxonomy_Widget extends SiteOrigin_Widget {
 		);
 	}
 }
-
 siteorigin_widget_register( 'sow-taxonomy', __FILE__, 'SiteOrigin_Widget_Taxonomy_Widget' );
