@@ -1,11 +1,17 @@
-FROM debian:bullseye-slim@sha256:0083feb8da4f624e3a0245e7752af2517d4b81d8b8db50c725644672a132a31b
+ARG PHP_VERSION=5.6
+ARG DEBIAN_VERSION=bullseye
+
+FROM debian:${DEBIAN_VERSION}-slim@sha256:0083feb8da4f624e3a0245e7752af2517d4b81d8b8db50c725644672a132a31b
+
+ARG PHP_VERSION
+ARG DEBIAN_VERSION
 
 RUN apt-get update \
  && apt-get install -y curl \
  && curl -sSLo /tmp/debsuryorg-archive-keyring.deb https://packages.sury.org/debsuryorg-archive-keyring.deb \
  && dpkg -i /tmp/debsuryorg-archive-keyring.deb \
  && rm -f /tmp/debsuryorg-archive-keyring.deb \
- && echo "deb https://packages.sury.org/php/ bullseye main" > /etc/apt/sources.list.d/php.list \
+ && echo "deb https://packages.sury.org/php/ ${DEBIAN_VERSION} main" > /etc/apt/sources.list.d/php.list \
  && apt-get update \
  && apt-get upgrade -y \
  && apt-get autoremove -y \
@@ -25,28 +31,41 @@ RUN apt-get update \
       apache2 \
       apache2-dev \
       libapache2-mod-auth-openidc \
-      libapache2-mod-php5.6 \
-      php5.6 \
-      php5.6-apcu \
-      php5.6-bz2 \
-      php5.6-curl \
-      php5.6-gd \
-      php5.6-intl \
-      php5.6-mbstring \
-      php5.6-mcrypt \
-      php5.6-mysql \
-      php5.6-opcache \
-      php5.6-readline \
-      php5.6-xml \
-      php5.6-zip \
+      libapache2-mod-php${PHP_VERSION} \
+      php${PHP_VERSION} \
+      php${PHP_VERSION}-apcu \
+      php${PHP_VERSION}-bz2 \
+      php${PHP_VERSION}-curl \
+      php${PHP_VERSION}-gd \
+      php${PHP_VERSION}-intl \
+      php${PHP_VERSION}-mbstring \
+      php${PHP_VERSION}-mcrypt \
+      php${PHP_VERSION}-mysql \
+      php${PHP_VERSION}-opcache \
+      php${PHP_VERSION}-readline \
+      php${PHP_VERSION}-xml \
+      php${PHP_VERSION}-zip \
  && (apt-get distclean || rm -rf  /var/cache/apt/archives /var/lib/apt/lists/*) \
  && a2enmod rewrite \
- && mkdir -p /var/cache/apache2/mod_auth_openidc/oidc-sessions /var/www/lib \
- && chown www-data:www-data /var/cache/apache2/mod_auth_openidc/oidc-sessions
+ && mkdir -p \
+      /var/cache/apache2/mod_auth_openidc/oidc-sessions/0 \
+      /var/cache/apache2/mod_auth_openidc/oidc-sessions/1 \
+      /var/cache/apache2/mod_auth_openidc/oidc-sessions/2 \
+      /var/cache/apache2/mod_auth_openidc/oidc-sessions/3 \
+      /var/www/lib \
+ && chown www-data:www-data \
+      /var/cache/apache2/mod_auth_openidc/oidc-sessions \
+      /var/cache/apache2/mod_auth_openidc/oidc-sessions/0 \
+      /var/cache/apache2/mod_auth_openidc/oidc-sessions/1 \
+      /var/cache/apache2/mod_auth_openidc/oidc-sessions/2 \
+      /var/cache/apache2/mod_auth_openidc/oidc-sessions/3 \
+ && ln -sf /proc/self/fd/1 /var/log/apache2/access.log \
+ && ln -sf /proc/self/fd/2 /var/log/apache2/error.log
 
-COPY docker/web/auth_openidc.conf /etc/apache2/mods-enabled/auth_openidc.conf
-COPY docker/web/000-default.conf /etc/apache2/sites-available/000-default.conf
-COPY . /var/www/html
+# These can be set in compose.yml with a volume instead.
+# COPY docker/web/auth_openidc.conf /etc/apache2/mods-enabled/auth_openidc.conf
+# COPY docker/web/000-default.conf /etc/apache2/sites-available/000-default.conf
+# COPY . /var/www/html
 
 RUN curl https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
     > /usr/bin/wp && \
