@@ -1,4 +1,11 @@
 <?php
+/*
+ * PublishPress Capabilities [Free]
+ * 
+ * Multisite-related functions / filter handlers
+ * 
+ */
+
 add_action( 'wpmu_new_blog', '_cme_new_blog' );
 function _cme_new_blog( $new_blog_id ) {
 	if ( $autocreate_roles = get_site_option( 'cme_autocreate_roles' ) ) {
@@ -6,9 +13,10 @@ function _cme_new_blog( $new_blog_id ) {
 		
 		$restore_blog_id = $blog_id;
 		
-		switch_to_blog( 1 );
-		//$wp_roles->reinit();
-		$wp_roles = new WP_Roles();
+		$main_site_id = (function_exists('get_main_site_id')) ? get_main_site_id() : 1;
+
+		switch_to_blog($main_site_id);
+		( method_exists( $wp_roles, 'for_site' ) ) ? $wp_roles->for_site() : $wp_roles->reinit();
 		
 		$main_site_caps = array();
 		$role_captions = array();
@@ -16,9 +24,9 @@ function _cme_new_blog( $new_blog_id ) {
 		$admin_role = $wp_roles->get_role('administrator');
 		$main_admin_caps = $admin_role->capabilities;
 		
-		if ( defined('PP_ACTIVE') )
-			$main_pp_only = (array) pp_get_option( 'supplemental_role_defs' );
-			//$pp_only[]= $newrole;
+		if ( defined('PRESSPERMIT_ACTIVE') ) {
+			$main_pp_only = (array) pp_capabilities_get_permissions_option( 'supplemental_role_defs' );
+		}
 	
 		foreach( $autocreate_roles as $role_name ) {
 			if ( $role = get_role( $role_name ) ) {
@@ -28,12 +36,11 @@ function _cme_new_blog( $new_blog_id ) {
 		}
 		
 		switch_to_blog($new_blog_id);
-		//$wp_roles->reinit();
-		$wp_roles = new WP_Roles();
+		( method_exists( $wp_roles, 'for_site' ) ) ? $wp_roles->for_site() : $wp_roles->reinit();
 		
-		if ( defined('PP_ACTIVE') ) {
+		if ( defined('PRESSPERMIT_ACTIVE') ) {
 			pp_refresh_options();
-			$blog_pp_only = (array) pp_get_option( 'supplemental_role_defs' );
+			$blog_pp_only = (array) pp_capabilities_get_permissions_option( 'supplemental_role_defs' );
 		}
 			
 		foreach( $main_site_caps as $role_name => $caps ) {
@@ -55,7 +62,7 @@ function _cme_new_blog( $new_blog_id ) {
 				$wp_roles->add_role( $role_name, $role_captions[$role_name], $caps );
 			}
 			
-			if ( defined('PP_ACTIVE') ) {
+			if ( defined('PRESSPERMIT_ACTIVE') ) {
 				if ( in_array( $role_name, $main_pp_only ) ) {
 					_cme_pp_default_pattern_role( $role_name );
 					$blog_pp_only []= $role_name;
@@ -64,14 +71,14 @@ function _cme_new_blog( $new_blog_id ) {
 			}
 		}
 		
-		if ( defined('PP_ACTIVE') )
-			pp_update_option( 'supplemental_role_defs', $blog_pp_only );
+		if ( defined('PRESSPERMIT_ACTIVE') ) {
+			pp_capabilities_update_permissions_option('supplemental_role_defs', $blog_pp_only);
+		}
+
+		restore_current_blog();
+		( method_exists( $wp_roles, 'for_site' ) ) ? $wp_roles->for_site() : $wp_roles->reinit();
 		
-		switch_to_blog($restore_blog_id);
-		//$wp_roles->reinit();
-		$wp_roles = new WP_Roles();
-		
-		if ( defined('PP_ACTIVE') )
+		if ( defined('PRESSPERMIT_ACTIVE') )
 			pp_refresh_options();
 	}
 }

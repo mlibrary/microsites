@@ -1,21 +1,20 @@
 <?php
-
 /*
 Widget Name: Icon
-Description: An iconic icon.
+Description: Display a customizable icon with color, size, alignment, and optional link settings.
 Author: SiteOrigin
 Author URI: https://siteorigin.com
+Documentation: https://siteorigin.com/widgets-bundle/icon-widget/
 */
 
 class SiteOrigin_Widget_Icon_Widget extends SiteOrigin_Widget {
-
-	function __construct() {
-
+	public function __construct() {
 		parent::__construct(
 			'sow-icon',
 			__( 'SiteOrigin Icon', 'so-widgets-bundle' ),
 			array(
-				'description' => __( 'An icon widget.', 'so-widgets-bundle' )
+				'description' => __( 'Display a customizable icon with color, size, alignment, and optional link settings.', 'so-widgets-bundle' ),
+				'help' => 'https://siteorigin.com/widgets-bundle/icon-widget/',
 			),
 			array(),
 			false,
@@ -23,7 +22,7 @@ class SiteOrigin_Widget_Icon_Widget extends SiteOrigin_Widget {
 		);
 	}
 
-	function get_widget_form() {
+	public function get_widget_form() {
 		return array(
 			'icon' => array(
 				'type'  => 'icon',
@@ -61,30 +60,52 @@ class SiteOrigin_Widget_Icon_Widget extends SiteOrigin_Widget {
 				'default' => false,
 				'label'   => __( 'Open in a new window', 'so-widgets-bundle' ),
 			),
+
+			'title' => array(
+				'type'  => 'text',
+				'label' => __( 'Title', 'so-widgets-bundle' ),
+				'description' => __( 'Tooltip text to be shown when hovering over the icon.', 'so-widgets-bundle' ),
+			),
 		);
 	}
 
-	function get_less_variables( $instance ) {
+	public function get_less_variables( $instance ) {
+		if ( empty( $instance ) ) {
+			return array();
+		}
+
 		return array(
-			'color'    => $instance['color'],
-			'alignment'    => $instance['alignment'],
-			'size'     => $instance['size'],
+			'color'     => $instance['color'],
+			'alignment' => $instance['alignment'],
+			'size'      => $instance['size'],
 		);
 	}
 
 	/**
 	 * Get the template variables for the headline
 	 *
-	 * @param $instance
-	 * @param $args
-	 *
 	 * @return array
 	 */
-	function get_template_variables( $instance, $args ) {
+	public function get_template_variables( $instance, $args ) {
 		return array(
 			'icon' => $instance['icon'],
 			'url' => $instance['url'],
 			'new_window' => $instance['new_window'],
+			'title' => ! empty( $instance['title'] ) ? $instance['title'] : '',
+		);
+	}
+
+	public function get_form_teaser() {
+		if ( class_exists( 'SiteOrigin_Premium' ) ) {
+			return false;
+		}
+
+		return array(
+			sprintf(
+				__( 'Add an icon title tooltip with %sSiteOrigin Premium%s', 'so-widgets-bundle' ),
+				'<a href="https://siteorigin.com/downloads/premium/?featured_addon=plugin/tooltip" target="_blank">',
+				'</a>'
+			),
 		);
 	}
 }

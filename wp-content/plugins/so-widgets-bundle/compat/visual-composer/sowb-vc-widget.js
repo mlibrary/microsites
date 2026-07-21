@@ -17,7 +17,7 @@ sowbForms.setupVcWidgetForm = function () {
 	} );
 
 	var prevWidget;
-	$widgetDropdown.mousedown( function () {
+	$widgetDropdown.on( 'mousedown', function() {
 		prevWidget = $widgetDropdown.find( 'option:selected' );
 	} );
 
@@ -67,7 +67,7 @@ sowbForms.setupVcWidgetForm = function () {
 			var sowb = vc.frame_window.sowb;
 
 			// Trigger Widgets Bundle widgets to setup
-			$( sowb ).trigger( 'setup_widgets' );
+			$( sowb ).trigger( 'setup_widgets', { preview: true } );
 		}
 	} );
 

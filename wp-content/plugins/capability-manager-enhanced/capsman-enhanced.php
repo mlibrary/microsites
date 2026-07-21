@@ -1,150 +1,163 @@
 <?php
-/*
-Plugin Name: Capability Manager Enhanced
-Plugin URI: http://presspermit.com/capability-manager
-Description: Manage WordPress role definitions, per-site or network-wide. Organizes post capabilities by post type and operation.
-Version: 1.5.7
-Author: Jordi Canals, Kevin Behrens
-Author URI: http://agapetry.net
-Text Domain: capsman-enhanced
-Domain Path: /lang/
- */
-
 /**
- * Capability Manager. Main Plugin File.
- * Plugin to create and manage Roles and Capabilities.
+ * Plugin Name: PublishPress Capabilities
+ * Plugin URI: https://publishpress.com/capability-manager/
+ * Description: Manage WordPress role definitions, per-site or network-wide. Organizes post capabilities by post type and operation.
+ * Version: 2.9.1
+ * Author: PublishPress
+ * Author URI: https://publishpress.com/
+ * Text Domain: capsman-enhanced
+ * Domain Path: /languages/
+ * Min WP Version: 4.9.7
+ * Requires PHP: 5.6.20
+ * License: GPLv3
  *
- * @author		Jordi Canals, Kevin Behrens
- * @copyright   Copyright (C) 2009, 2010 Jordi Canals; modifications Copyright (C) 2012-2015 Kevin Behrens
+ * Copyright (c) 2022 PublishPress
+ *
+ * ------------------------------------------------------------------------------
+ * Based on Capability Manager
+ * Author: Jordi Canals
+ * Copyright (c) 2009, 2010 Jordi Canals
+ * ------------------------------------------------------------------------------
+ *
+ * @package 	capability-manager-enhanced
+ * @author		PublishPress
+ * @copyright   Copyright (C) 2009, 2010 Jordi Canals; modifications Copyright (C) 2022 PublishPress
  * @license		GNU General Public License version 3
- * @link		http://agapetry.net
- *
-
-	Copyright 2009, 2010 Jordi Canals <devel@jcanals.cat>
-	Modifications Copyright 2012-2015, Kevin Behrens <kevin@agapetry.net>
-	
-	This program is free software; you can redistribute it and/or
-	modify it under the terms of the GNU General Public License
-	version 3 as published by the Free Software Foundation.
-
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details <http://www.gnu.org/licenses/>.
+ * @link		https://publishpress.com/
+ * @version 	2.4.0
  */
 
-if ( ! defined( 'CAPSMAN_VERSION' ) ) {
-	define( 'CAPSMAN_VERSION', '1.5.7' );
-	define( 'CAPSMAN_ENH_VERSION', '1.5.7' );
+
+$includeFilebRelativePath = '/publishpress/publishpress-instance-protection/include.php';
+if (file_exists(__DIR__ . '/vendor' . $includeFilebRelativePath)) {
+    require_once __DIR__ . '/vendor' . $includeFilebRelativePath;
 }
 
-if ( cme_is_plugin_active( 'capsman.php' ) ) {
-	$message = __( '<strong>Error:</strong> Capability Manager Extended cannot function because another copy of Capability Manager is active.', 'capsman-enhanced' );
-	add_action('admin_notices', create_function('', 'echo \'<div id="message" class="error fade" style="color: black">' . $message . '</div>\';'));
-	return;
-} else {
-	define ( 'CME_FILE', __FILE__ );
-	define ( 'AK_CMAN_PATH', dirname(__FILE__) );
-	define ( 'AK_CMAN_LIB', AK_CMAN_PATH . '/includes' );
+if (class_exists('PublishPressInstanceProtection\\Config')) {
+    $pluginCheckerConfig = new PublishPressInstanceProtection\Config();
+    $pluginCheckerConfig->pluginSlug    = 'capsman-enhanced';
+    $pluginCheckerConfig->pluginFolder  = 'capability-manager-enhanced';
+    $pluginCheckerConfig->pluginName    = 'PublishPress Capabilities';
 
-	/**
-	 * Sets an admin warning regarding required PHP version.
-	 *
-	 * @hook action 'admin_notices'
-	 * @return void
-	 */
-	function _cman_php_warning() {
-		$data = get_plugin_data(__FILE__);
-		load_plugin_textdomain('capsman-enhanced', false, basename(dirname(__FILE__)) .'/lang');
+    $pluginChecker = new PublishPressInstanceProtection\InstanceChecker($pluginCheckerConfig);
+}
 
-		echo '<div class="error"><p><strong>' . __('Warning:', 'capsman-enhanced') . '</strong> '
-			. sprintf(__('The active plugin %s is not compatible with your PHP version.', 'capsman-enhanced') .'</p><p>',
-				'&laquo;' . $data['Name'] . ' ' . $data['Version'] . '&raquo;')
-			. sprintf(__('%s is required for this plugin.', 'capsman-enhanced'), 'PHP-5 ')
-			. '</p></div>';
+if (!defined('CAPSMAN_VERSION')) {
+	define('CAPSMAN_VERSION', '2.9.1');
+	define('CAPSMAN_ENH_VERSION', CAPSMAN_VERSION);
+	define('PUBLISHPRESS_CAPS_VERSION', CAPSMAN_VERSION);
+}
+
+foreach (get_option('active_plugins') as $plugin_file) {
+	if ( false !== strpos($plugin_file, 'capsman.php') ) {
+		add_action('admin_notices', function() {
+			echo '<div id="message" class="error fade" style="color: black">' . sprintf(esc_html__('%1s Error: %2s  PublishPress Capabilities cannot function because another copy of Capability Manager is active.', 'capsman-enhanced'), '<strong>', '</strong>') . '</div>';
+		});
+		return;
 	}
+}
 
-	// ============================================ START PROCEDURE ==========
+$pro_active = false;
 
-	// Check required PHP version.
-	if ( version_compare(PHP_VERSION, '5.0.0', '<') ) {
-		// Send an armin warning
-		add_action('admin_notices', '_cman_php_warning');
-	} else {
-		global $pagenow;
-	
-		if ( is_admin() && 
-		( isset($_REQUEST['page']) && in_array( $_REQUEST['page'], array( 'capsman', 'capsman-tool' ) ) 
-		|| ( ! empty($_SERVER['SCRIPT_NAME']) && strpos( $_SERVER['SCRIPT_NAME'], 'p-admin/plugins.php' ) && ! empty($_REQUEST['action'] ) ) 
-		|| ( isset($_GET['action']) && 'reset-defaults' == $_GET['action'] )
-		|| in_array( $pagenow, array( 'users.php', 'user-edit.php', 'profile.php', 'user-new.php' ) )
-		) ) {
-			global $capsman;
-			
-			// Run the plugin
-			include_once ( AK_CMAN_PATH . '/framework/loader.php' );
-			include ( AK_CMAN_LIB . '/manager.php' );
-			$capsman = new CapabilityManager(__FILE__, 'capsman');
-			
-			if ( isset($_REQUEST['page']) && ( 'capsman' == $_REQUEST['page'] ) ) {
-				add_action( 'admin_enqueue_scripts', '_cme_pp_scripts' );
+foreach ((array)get_option('active_plugins') as $plugin_file) {
+    if (false !== strpos($plugin_file, 'capabilities-pro.php')) {
+        $pro_active = true;
+        break;
+    }
+}
+
+if (!$pro_active && is_multisite()) {
+    foreach (array_keys((array)get_site_option('active_sitewide_plugins')) as $plugin_file) {
+        if (false !== strpos($plugin_file, 'capabilities-pro.php')) {
+            $pro_active = true;
+            break;
+        }
+    }
+}
+
+if ($pro_active) {
+    add_filter(
+        'plugin_row_meta',
+        function($links, $file)
+        {
+            if ($file == plugin_basename(__FILE__)) {
+                $links[]= '<strong>' . esc_html__('This plugin can be deleted.', 'capsman-enhanced') . '</strong>';
+            }
+
+            return $links;
+        },
+        10, 2
+    );
+}
+
+if (defined('CME_FILE') || $pro_active) {
+	return;
+}
+
+define ( 'CME_FILE', __FILE__ );
+define ('PUBLISHPRESS_CAPS_ABSPATH', __DIR__);
+
+require_once (dirname(__FILE__) . '/includes/functions.php');
+
+// ============================================ START PROCEDURE ==========
+
+// Check required PHP version.
+if ( version_compare(PHP_VERSION, '5.4.0', '<') ) {
+	// Send an armin warning
+	add_action('admin_notices', function() {
+		$data = get_plugin_data(__FILE__);
+		load_plugin_textdomain('capsman-enhanced', false, basename(dirname(__FILE__)) .'/languages');
+
+		echo '<div class="error"><p><strong>' . esc_html__('Warning:', 'capsman-enhanced') . '</strong> '
+			. sprintf(esc_html__('The active plugin %s is not compatible with your PHP version.', 'capsman-enhanced') .'</p><p>',
+				'&laquo;' . esc_html($data['Name']) . ' ' . esc_html($data['Version']) . '&raquo;')
+			. sprintf(esc_html__('%s is required for this plugin.', 'capsman-enhanced'), 'PHP-5 ')
+			. '</p></div>';
+	});
+} else {
+	global $pagenow;
+
+	// redirect legacy URLs
+	if (!empty($_REQUEST['page'])) {
+		foreach(['capsman' => 'pp-capabilities', 'capsman-tool' => 'pp-capabilities-backup'] as $find => $replace) {
+			if (isset($_REQUEST['page']) && ($find == $_REQUEST['page']) && !empty($_SERVER['REQUEST_URI'])) {
+				$location = str_replace("page=$find", "page=$replace", esc_url_raw($_SERVER['REQUEST_URI']));
+				header( "Location: $location", true);
+				exit;
 			}
-		} else {
-			load_plugin_textdomain('capsman-enhanced', false, basename(dirname(__FILE__)) .'/lang');
-			add_action( 'admin_menu', 'cme_submenus', 20 );
 		}
 	}
+
+	if (is_admin()) {
+
+		// @todo: refactor
+		require_once (dirname(__FILE__) . '/includes/functions-admin.php');
+
+		global $capsman_admin;
+		require_once (dirname(__FILE__) . '/includes/admin-load.php');
+		$capsman_admin = new PP_Capabilities_Admin_UI();
+	}
+
+	if (is_admin() && !defined('PUBLISHPRESS_CAPS_PRO_VERSION')) {
+		require_once(__DIR__ . '/includes-core/CoreAdmin.php');
+		new \PublishPress\Capabilities\CoreAdmin();
+	}
 }
 
+add_action( 'init', '_cme_init' );
 add_action( 'plugins_loaded', '_cme_act_pp_active', 1 );
 
-function _cme_act_pp_active() {
-	if ( defined('PP_VERSION') || defined('PPC_VERSION') )
-		define( 'PP_ACTIVE', true );
-}
-
-function _cme_pp_scripts() {
-	wp_enqueue_style( 'plugin-install' );
-	wp_enqueue_script( 'plugin-install' );
-	add_thickbox();
-}
-
-// perf enchancement: display submenu links without loading framework and plugin code
-function cme_submenus() {
-	$cap_name = ( is_super_admin() ) ? 'manage_capabilities' : 'restore_roles';
-	add_management_page(__('Capability Manager', 'capsman-enhanced'),  __('Capability Manager', 'capsman-enhanced'), $cap_name, 'capsman' . '-tool', 'cme_fakefunc');
-	
-	if ( did_action( 'pp_admin_menu' ) ) {	// Put Capabilities link on Permissions menu if Press Permit is active and user has access to it
-		global $pp_admin;
-		$menu_caption = ( defined('WPLANG') && WPLANG && ( 'en_EN' != WPLANG ) ) ? __('Capabilities', 'capsman-enhanced') : 'Role Capabilities';
-		add_submenu_page( $pp_admin->get_menu('options'), __('Capability Manager', 'capsman-enhanced'),  $menu_caption, 'manage_capabilities', 'capsman', 'cme_fakefunc' );
-	} else {
-		add_users_page( __('Capability Manager', 'capsman-enhanced'),  __('Capabilities', 'capsman-enhanced'), 'manage_capabilities', 'capsman', 'cme_fakefunc');	
-	}
-}
-
-function cme_is_plugin_active($check_plugin_file) {
-	if ( ! $check_plugin_file )
-		return false;
-
-	$plugins = get_option('active_plugins');
-
-	foreach ( $plugins as $plugin_file ) {
-		if ( false !== strpos($plugin_file, $check_plugin_file) )
-			return $plugin_file;
-	}
-}
-
-// if a role is marked as hidden, also default it for use by Press Permit as a Pattern Role (when PP Collaborative Editing is activated and Advanced Settings enabled)
-function _cme_pp_default_pattern_role( $role ) {
-	if ( ! $pp_role_usage = get_option( 'pp_role_usage' ) )
-		$pp_role_usage = array();
-		
-	if ( empty( $pp_role_usage[$role] ) ) {
-		$pp_role_usage[$role] = 'pattern';
-		update_option( 'pp_role_usage', $pp_role_usage );
-	}
-}
+add_action( 'init', '_cme_cap_helper', 49 );  // Press Permit Cap Helper, registered at 50, will leave caps which we've already defined
+//add_action( 'wp_loaded', '_cme_cap_helper_late_init', 99 );	// now instead adding registered_post_type, registered_taxonomy action handlers for latecomers
+																// @todo: do this in PP Core also
 
 if ( is_multisite() )
-	require_once ( AK_CMAN_PATH . '/includes/network.php' );
+	require_once ( dirname(__FILE__) . '/includes/network.php' );
+
+// Check if Permissions is installed
+if (!cme_is_plugin_active('press-permit-core.php') && !cme_is_plugin_active('presspermit-pro.php')) {
+	define('CAPSMAN_PERMISSIONS_INSTALLED', false);
+} else {
+	define('CAPSMAN_PERMISSIONS_INSTALLED', true);
+}
