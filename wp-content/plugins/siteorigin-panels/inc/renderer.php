@@ -3,6 +3,7 @@
 class SiteOrigin_Panels_Renderer {
 	private $inline_css;
 	private $container;
+	private $side = array( 'top', 'right', 'bottom', 'left' );
 
 	public function __construct() {
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_styles' ), 1 );
@@ -13,6 +14,61 @@ class SiteOrigin_Panels_Renderer {
 		static $single;
 
 		return empty( $single ) ? $single = new self() : $single;
+	}
+
+	/**
+	 * Determine whether the current row contains no widgets.
+	 *
+	 * @param array $row The row data.
+	 *
+	 * @return bool
+	 */
+	private function is_empty_row( $row ) {
+		if ( empty( $row['cells'] ) || ! is_array( $row['cells'] ) ) {
+			return true;
+		}
+
+		foreach ( $row['cells'] as $cell ) {
+			if ( ! empty( $cell['widgets'] ) ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Determine whether the current row has a background style set.
+	 *
+	 * @param array $row The row data.
+	 *
+	 * @return bool
+	 */
+	private function row_has_background( $row ) {
+		if ( empty( $row['style'] ) || ! is_array( $row['style'] ) ) {
+			return false;
+		}
+
+		return (
+			! empty( $row['style']['background'] ) ||
+			! empty( $row['style']['background_image_attachment'] ) ||
+			! empty( $row['style']['background_image_attachment_fallback'] )
+		);
+	}
+
+	/**
+	 * Determine whether an empty row with a background should remain visible.
+	 *
+	 * @param array $row The row data.
+	 *
+	 * @return bool
+	 */
+	private function should_display_empty_background_row( $row ) {
+		return (
+			siteorigin_panels_setting( 'display-empty-rows-with-background' ) &&
+			$this->is_empty_row( $row ) &&
+			$this->row_has_background( $row )
+		);
 	}
 
 	/**
@@ -90,6 +146,7 @@ class SiteOrigin_Panels_Renderer {
 			// Filter the bottom margin for this row with the arguments
 			$panels_margin_bottom = apply_filters( 'siteorigin_panels_css_row_margin_bottom', $settings['margin-bottom'] . 'px', $row, $ri, $panels_data, $post_id );
 			$panels_mobile_margin_bottom = apply_filters( 'siteorigin_panels_css_row_mobile_margin_bottom', $settings['row-mobile-margin-bottom'] . 'px', $row, $ri, $panels_data, $post_id );
+			$display_empty_background_row = $this->should_display_empty_background_row( $row );
 
 			if ( SiteOrigin_Panels_Styles::single()->has_overlay( $row ) ) {
 				$css->add_row_css( $post_id, $ri, array(
@@ -97,6 +154,15 @@ class SiteOrigin_Panels_Renderer {
 				), array(
 					'position' => 'relative',
 				) );
+
+				// Prevent display issue with fixed backgrounds on iOS.
+				if ( $row['style']['background_display'] === 'fixed' ) {
+					$css->add_row_css( $post_id, $ri, array(
+						'.panel-has-overlay > .panel-row-style > .panel-background-overlay',
+					), array(
+						'background-attachment' => 'scroll !important',
+					), $panels_tablet_width );
+				}
 			}
 
 			if ( empty( $row['cells'] ) ) {
@@ -149,6 +215,15 @@ class SiteOrigin_Panels_Renderer {
 					$css->add_cell_css( $post_id, $ri, $ci, '', array(
 						'position' => 'relative',
 					) );
+
+						// Prevent display issue with fixed backgrounds on iOS.
+					if ( $cell['style']['background_display'] === 'fixed' ) {
+						$css->add_cell_css( $post_id, $ri, $ci, array(
+							'.panel-has-overlay > .panel-cell-style > .panel-background-overlay',
+						), array(
+							'background-attachment' => 'scroll !important',
+						), $panels_tablet_width );
+					}
 				}
 
 				// Add in any widget specific CSS
@@ -242,6 +317,21 @@ class SiteOrigin_Panels_Renderer {
 								'position' => 'relative',
 							)
 						);
+
+						// Prevent display issue with fixed backgrounds on iOS.
+						if ( $widget['panels_info']['style']['background_display'] === 'fixed' ) {
+							$css->add_widget_css(
+								$post_id,
+								$ri,
+								$ci,
+								$wi,
+								'.panel-has-overlay > .panel-widget-style > .panel-background-overlay',
+								array(
+									'background-attachment' => 'scroll !important',
+								),
+								$panels_tablet_width
+							);
+						}
 					}
 				}
 			}
@@ -386,10 +476,14 @@ class SiteOrigin_Panels_Renderer {
 				'padding' => 0,
 			), $panels_mobile_width );
 
-			// Hide empty cells on mobile
-			$css->add_row_css( $post_id, false, ' .panel-grid-cell-empty', array(
-				'display' => 'none',
-			), $panels_mobile_width );
+			// Hide empty columns on mobile unless "Display Empty Columns With Background" is enabled.
+			if ( ! siteorigin_panels_setting( 'display-empty-rows-with-background' ) ) {
+				foreach ( $layout_data as $ri => $row ) {
+					$css->add_row_css( $post_id, $ri, ' .panel-grid-cell-empty', array(
+						'display' => 'none',
+					), $panels_mobile_width );
+				}
+			}
 
 			// Hide empty cells on mobile
 			$css->add_row_css( $post_id, false, ' .panel-grid-cell-mobile-last', array(
@@ -471,7 +565,7 @@ class SiteOrigin_Panels_Renderer {
 		if ( empty( $post_id ) ) {
 			$post_id = get_the_ID();
 
-			if ( class_exists( 'WooCommerce' ) && is_shop() ) {
+			if ( SiteOrigin_Panels_Compat_WooCommerce::should_use_shop_page_id() ) {
 				$post_id = wc_get_page_id( 'shop' );
 			}
 		}
@@ -620,7 +714,17 @@ class SiteOrigin_Panels_Renderer {
 			}
 
 			if ( ! empty( $style['border_color'] ) ) {
-				$attributes['style'] .= 'border: ' . ( ! empty( $style['border_thickness'] ) ? $style['border_thickness'] : '1px' ) . ' solid ' . $style['border_color'] . ';';
+				$border_thickness = ! empty( $style['border_thickness'] ) ? $style['border_thickness'] : '1px 1px 1px 1px';
+
+				// Does this have legacy border thickness?
+				if ( strpos( $border_thickness, ' ' ) === false ) {
+					$attributes['style'] .= 'border: ' . $border_thickness . ' solid ' . $style['border_color'] . ';';
+				} else {
+					$border_thickness_split = explode( ' ', $border_thickness );
+					foreach ( $border_thickness_split as $i => $border_thickness_part ) {
+						$attributes['style'] .= 'border-' . $this->side[ $i ] . ': ' . $border_thickness_part . ' solid ' . $style['border_color'] .';';
+					}
+				}
 			}
 		}
 
@@ -676,9 +780,9 @@ class SiteOrigin_Panels_Renderer {
 				}
 
 				if ( is_array( $value ) ) {
-					$style_wrapper .= $name . '="' . esc_attr( implode( ' ', array_unique( $value ) ) ) . '" ';
+					$style_wrapper .= $this->sanitize_attribute_key( $name ) . '="' . esc_attr( implode( ' ', array_unique( $value ) ) ) . '" ';
 				} else {
-					$style_wrapper .= $name . '="' . esc_attr( $value ) . '" ';
+					$style_wrapper .= $this->sanitize_attribute_key( $name ) . '="' . esc_attr( $value ) . '" ';
 				}
 			}
 			$style_wrapper .= '>';
@@ -717,7 +821,7 @@ class SiteOrigin_Panels_Renderer {
 		if ( empty( $post_id ) ) {
 			$post_id = get_the_ID();
 
-			if ( class_exists( 'WooCommerce' ) && is_shop() ) {
+			if ( SiteOrigin_Panels_Compat_WooCommerce::should_use_shop_page_id() ) {
 				$post_id = wc_get_page_id( 'shop' );
 			}
 		}
@@ -810,7 +914,7 @@ class SiteOrigin_Panels_Renderer {
 		$before_widget = '<div ';
 
 		foreach ( $attributes as $k => $v ) {
-			$before_widget .= esc_attr( $k ) . '="' . esc_attr( $v ) . '" ';
+			$before_widget .= $this->sanitize_attribute_key( $k ) . '="' . esc_attr( $v ) . '" ';
 		}
 		$before_widget .= '>';
 
@@ -1014,7 +1118,7 @@ class SiteOrigin_Panels_Renderer {
 
 		foreach ( $attributes as $name => $value ) {
 			if ( $value ) {
-				echo ' ' . esc_html( $name ) . '="' . esc_attr( $value ) . '" ';
+				echo ' ' . $this->sanitize_attribute_key( $name ) . '="' . esc_attr( $value ) . '" ';
 			}
 		}
 		echo '>';
@@ -1037,6 +1141,9 @@ class SiteOrigin_Panels_Renderer {
 
 		$row_classes = array( 'panel-grid' );
 		$row_classes[] = ! empty( $row_style_wrapper ) ? 'panel-has-style' : 'panel-no-style';
+		if ( $this->should_display_empty_background_row( $row ) ) {
+			$row_classes[] = 'panel-empty-row-has-background';
+		}
 
 		if ( SiteOrigin_Panels_Styles::single()->has_overlay( $row ) ) {
 			$row_classes[] = 'panel-has-overlay';
@@ -1231,4 +1338,21 @@ class SiteOrigin_Panels_Renderer {
 		return siteorigin_panels_url( 'css/front-flex' . SITEORIGIN_PANELS_CSS_SUFFIX . '.css' );
 	}
 
+	function sanitize_attribute_key( $attr = null ) {
+		if ( empty( $attr ) ) {
+			return 'invalid-attribute';
+		}
+
+		$attr = sanitize_key( strtolower( $attr ) );
+
+		// "On" prefixed attributes are too risky to allow.
+		if (
+			empty( $attr ) ||
+			strpos( $attr, 'on' ) === 0
+		) {
+			return 'invalid-attribute';
+		};
+
+		return $attr;
+	}
 }

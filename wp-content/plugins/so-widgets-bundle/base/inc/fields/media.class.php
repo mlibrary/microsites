@@ -41,10 +41,16 @@ class SiteOrigin_Widget_Field_Media extends SiteOrigin_Widget_Field_Base {
 	 */
 	protected $fallback;
 
+	/**
+	 * Initializes the media field, adding the image search dialog if necessary.
+	 */
 	protected function initialize() {
 		static $once;
 
-		if ( empty( $once ) ) {
+		if (
+			empty( $once ) &&
+			$this->user_can_upload_media()
+		) {
 			add_action( 'siteorigin_widgets_footer_admin_templates', array( $this, 'image_search_dialog' ) );
 		}
 		$once = true;
@@ -57,6 +63,16 @@ class SiteOrigin_Widget_Field_Media extends SiteOrigin_Widget_Field_Base {
 			'image_search' => __( 'Image Search', 'so-widgets-bundle' ),
 			'library' => 'image',
 		);
+	}
+
+	/**
+	 * Checks if the current user has permissions to upload media.
+	 * If they don't, the media search button and dialog will not be rendered.
+	 *
+	 * @return bool True if the user can upload media, false otherwise.
+	 */
+	private function user_can_upload_media() : bool {
+		return current_user_can( 'upload_files' );
 	}
 
 	protected function render_field( $value, $instance ) {
@@ -108,7 +124,7 @@ class SiteOrigin_Widget_Field_Media extends SiteOrigin_Widget_Field_Base {
 			>
 				<?php echo esc_html( $this->choose ); ?>
 			</a>
-			<?php if ( $this->library == 'image' ) { ?>
+			<?php if ( $this->library == 'image' && $this->user_can_upload_media() ) { ?>
 				<a href="#" class="find-image-button">
 					<?php echo esc_html( $this->image_search ); ?>
 				</a>
@@ -163,12 +179,25 @@ class SiteOrigin_Widget_Field_Media extends SiteOrigin_Widget_Field_Base {
 		return $instance;
 	}
 
+	public function get_related_instance_keys() {
+		return array( $this->get_fallback_field_name( $this->base_name ) );
+	}
+
 	public function get_fallback_field_name( $base_name ) {
 		$v_name = $base_name;
 
 		if ( strpos( $v_name, '][' ) !== false ) {
-			// Remove this splitter
-			$v_name = substr( $v_name, strpos( $v_name, '][' ) + 2 );
+			// Remove everything up to the LAST splitter: the stored companion
+			// key is always the final segment + '_fallback' regardless of
+			// nesting depth (render-path instances are created with unprefixed
+			// names, so the posted key never carries container prefixes).
+			// strrpos, not strpos — a base_name nested two or more containers
+			// deep (e.g. 'frames][background][image') contains multiple
+			// splitters, and taking the first would yield a key like
+			// 'background][image_fallback' that never matches the real stored
+			// key. Matches get_selected_editor_field_name() in
+			// tinymce.class.php.
+			$v_name = substr( $v_name, strrpos( $v_name, '][' ) + 2 );
 		}
 
 		return $v_name . '_fallback';
@@ -197,7 +226,9 @@ class SiteOrigin_Widget_Field_Media extends SiteOrigin_Widget_Field_Base {
 				<div class="so-widgets-dialog-overlay"></div>
 
 				<div class="so-widgets-toolbar">
-					<h3><?php _e( 'Search For Images', 'so-widgets-bundle' ); ?></h3>
+					<h3>
+						<?php echo esc_html__( 'Search For Images', 'so-widgets-bundle' ); ?>
+					</h3>
 					<div class="close" tabindex="0"><span class="dashicons dashicons-no-alt"></span></div>
 				</div>
 
@@ -205,7 +236,7 @@ class SiteOrigin_Widget_Field_Media extends SiteOrigin_Widget_Field_Base {
 					<div id="so-widgets-image-search-frame">
 
 						<form id="so-widgets-image-search-form">
-							<input type="text" value="" name="s" class="widefat so-widgets-search-input" placeholder="<?php echo esc_attr_e( 'Search For Images', 'so-widgets-bundle' ); ?>" />
+							<input type="text" value="" name="s" class="widefat so-widgets-search-input" placeholder="<?php esc_attr_e( 'Search For Images', 'so-widgets-bundle' ); ?>" />
 							<?php wp_nonce_field( 'so-image', '_sononce', false ); ?>
 							<button type="submit" class="button-primary so-widgets-search-button">
 								<span class="dashicons dashicons-search"></span>

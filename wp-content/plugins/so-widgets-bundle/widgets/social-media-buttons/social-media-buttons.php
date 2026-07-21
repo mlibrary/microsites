@@ -2,8 +2,10 @@
 /*
 Widget Name: Social Media Buttons
 Description: Add social media buttons to your site with personalized icons, colors, and design settings.
+Author: SiteOrigin
 Author URI: https://siteorigin.com
 Documentation: https://siteorigin.com/widgets-bundle/social-media-buttons-widget/
+Keywords: button, icon, link, network, social
 */
 
 class SiteOrigin_Widget_SocialMediaButtons_Widget extends SiteOrigin_Widget {
@@ -265,7 +267,9 @@ class SiteOrigin_Widget_SocialMediaButtons_Widget extends SiteOrigin_Widget {
 					}
 				}
 
-				if (
+				if ( $network['name'] === 'skype' ) {
+					$network['icon_name'] = 'fontawesome-sow-fab-microsoft';
+				} elseif (
 					$network['name'] != 'envelope' &&
 					$network['name'] != 'suitcase' &&
 					$network['name'] != 'rss' &&
@@ -360,9 +364,8 @@ class SiteOrigin_Widget_SocialMediaButtons_Widget extends SiteOrigin_Widget {
 
 				if ( $instance['design']['theme'] == 'wire' ) {
 					$call .= ! empty( $network['border_color'] ) ? ', @border_color:' . $network['border_color'] : '';
-					$border_color_hover_fallback = ! empty( $network['border_color'] ) ? ', @button_color_hover:' . $network['border_color'] : '';
-					$call .= ! empty( $network['border_hover_color'] ) ? ', @border_hover_color:' . $network['border_hover_color'] : $border_color_hover_fallback;
-
+					$border_hover_color_fallback = ! empty( $network['border_color'] ) ? ', @border_hover_color:' . $network['border_color'] : ", @border_hover_color: ''";
+					$call .= ! empty( $network['border_hover_color'] ) ? ', @border_hover_color:' . $network['border_hover_color'] : $border_hover_color_fallback;
 				}
 				$call .= ');';
 				$calls[] = $call;

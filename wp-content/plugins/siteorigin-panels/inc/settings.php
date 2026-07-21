@@ -174,6 +174,7 @@ class SiteOrigin_Panels_Settings {
 		$defaults['mobile-cell-margin']          = $mobile_cell_margin;
 		$defaults['widget-mobile-margin-bottom'] = '';
 		$defaults['margin-bottom-last-row']      = false;
+		$defaults['display-empty-rows-with-background'] = false;
 		$defaults['margin-sides']                = 30;
 		$defaults['full-width-container']        = 'body';
 		$defaults['output-css-header']           = 'auto';
@@ -226,10 +227,16 @@ class SiteOrigin_Panels_Settings {
 	 * Add the Page Builder settings page
 	 */
 	public function add_settings_page() {
-		$page = add_options_page( esc_html( 'SiteOrigin Page Builder', 'siteorigin-panels' ), esc_html( 'Page Builder', 'siteorigin-panels' ), 'manage_options', 'siteorigin_panels', array(
-			$this,
-			'display_settings_page',
-		) );
+		$page = add_options_page(
+			esc_html__( 'SiteOrigin Page Builder', 'siteorigin-panels' ),
+			esc_html__( 'Page Builder', 'siteorigin-panels' ),
+			'manage_options',
+			'siteorigin_panels',
+			array(
+				$this,
+				'display_settings_page',
+			)
+		);
 		add_action( 'load-' . $page, array( $this, 'add_help_tab' ) );
 		add_action( 'load-' . $page, array( $this, 'save_settings' ) );
 	}
@@ -253,7 +260,7 @@ class SiteOrigin_Panels_Settings {
 
 		$screen->add_help_tab( array(
 			'id'      => 'panels-help-tab',
-			'title'   => esc_html( 'Page Builder Settings', 'siteorigin-panels' ),
+			'title'   => esc_html__( 'Page Builder Settings', 'siteorigin-panels' ),
 			'content' => $content,
 		) );
 	}
@@ -496,6 +503,12 @@ class SiteOrigin_Panels_Settings {
 			'description' => __( 'Allow margin below the last row.', 'siteorigin-panels' ),
 		);
 
+		$fields['layout']['fields']['display-empty-rows-with-background'] = array(
+			'type'        => 'checkbox',
+			'label'       => __( 'Display Empty Columns With Background', 'siteorigin-panels' ),
+			'description' => __( 'Display empty columns when a column background color or image is set.', 'siteorigin-panels' ),
+		);
+
 		$fields['layout']['fields']['mobile-cell-margin'] = array(
 			'type'        => 'number',
 			'unit'        => 'px',
@@ -607,7 +620,7 @@ class SiteOrigin_Panels_Settings {
 				<label class="widefat">
 					<input name="<?php echo esc_attr( $field_name ); ?>"
 						type="checkbox" <?php checked( ! empty( $value ) ); ?> />
-					<?php esc_html_e( ! empty( $field['checkbox_text'] ) ? $field['checkbox_text'] : __( 'Enabled', 'siteorigin-panels' ) ); ?>
+					<?php echo esc_html( ! empty( $field['checkbox_text'] ) ? $field['checkbox_text'] : __( 'Enabled', 'siteorigin-panels' ) ); ?>
 				</label>
 				<?php
 				break;

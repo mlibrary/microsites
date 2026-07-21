@@ -5,6 +5,7 @@ Description: Create a custom button with flexible styling, icon support, and cli
 Author: SiteOrigin
 Author URI: https://siteorigin.com
 Documentation: https://siteorigin.com/widgets-bundle/button-widget-documentation/
+Keywords: event, icon, link
 */
 
 class SiteOrigin_Widget_Button_Widget extends SiteOrigin_Widget {
@@ -126,7 +127,7 @@ class SiteOrigin_Widget_Button_Widget extends SiteOrigin_Widget {
 							'left' => __( 'Left', 'so-widgets-bundle' ),
 							'right' => __( 'Right', 'so-widgets-bundle' ),
 							'center' => __( 'Center', 'so-widgets-bundle' ),
-							'justify' => __( 'Justify', 'so-widgets-bundle' ),
+							'justify' => __( 'Full Width', 'so-widgets-bundle' ),
 						),
 					),
 					'mobile_align' => array(
@@ -137,7 +138,7 @@ class SiteOrigin_Widget_Button_Widget extends SiteOrigin_Widget {
 							'left' => __( 'Left', 'so-widgets-bundle' ),
 							'right' => __( 'Right', 'so-widgets-bundle' ),
 							'center' => __( 'Center', 'so-widgets-bundle' ),
-							'justify' => __( 'Justify', 'so-widgets-bundle' ),
+							'justify' => __( 'Full Width', 'so-widgets-bundle' ),
 						),
 					),
 					'theme' => array(
@@ -301,7 +302,7 @@ class SiteOrigin_Widget_Button_Widget extends SiteOrigin_Widget {
 		if ( ! empty( $classes ) ) {
 			$classes .= ' ';
 		}
-		$classes .= 'ow-icon-placement-' . $instance['button_icon']['icon_placement'];
+		$classes .= 'sowb-button ow-icon-placement-' . $instance['button_icon']['icon_placement'];
 
 		if ( ! empty( $instance['design']['hover'] ) ) {
 			$classes .= ' ow-button-hover';
@@ -352,7 +353,7 @@ class SiteOrigin_Widget_Button_Widget extends SiteOrigin_Widget {
 
 		return array(
 			'button_attributes' => apply_filters( 'siteorigin_widgets_button_attributes', $button_attributes, $instance ),
-			'href' => ! empty( $instance['url'] ) ? $instance['url'] : '#',
+			'href' => ! empty( $instance['url'] ) ? $instance['url'] : '',
 			'on_click' => ! empty( $attributes['on_click'] ) ? $attributes['on_click'] : '',
 			'align' => $instance['design']['align'],
 			'icon_image_url' => $icon_image_url,

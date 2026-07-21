@@ -1,4 +1,9 @@
 <?php
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Add MonsterInsights tests to the WP Site Health area.
  */
@@ -83,7 +88,7 @@ class MonsterInsights_WP_Site_Health_Lite {
 
 		if ( $this->is_tracking() ) {
 			$tests['async']['monsterinsights_tracking_code'] = array(
-				'label' => __( 'MonsterInsights Tracking Code', 'ga-premium' ),
+				'label' => __( 'MonsterInsights Tracking Code', 'google-analytics-for-wordpress' ),
 				'test'  => 'monsterinsights_test_tracking_code',
 			);
 		}
@@ -152,7 +157,7 @@ class MonsterInsights_WP_Site_Health_Lite {
 	private function is_coming_soon_active() {
 		if ( defined( 'SEED_CSP4_SHORTNAME' ) ) {
 			// SeedProd
-			// http://www.seedprod.com
+			// https://www.seedprod.com
 
 			$settings = get_option( 'seed_csp4_settings_content' );
 
@@ -181,19 +186,19 @@ class MonsterInsights_WP_Site_Health_Lite {
 			return '1' === get_option( 'wp_maintenance_active' );
 		} elseif ( defined( 'ACX_CSMA_CURRENT_VERSION' ) ) {
 			// Under Construction / Maintenance Mode From Acurax
-			// http://www.acurax.com/products/under-construction-maintenance-mode-wordpress-plugin
+			// https://www.acurax.com/products/under-construction-maintenance-mode-wordpress-plugin
 
 			return '1' === get_option( 'acx_csma_activation_status' );
 		} elseif ( defined( 'SAHU_SO_PLUGIN_URL' ) ) {
 			// Site Offline
-			// http://www.freehtmldesigns.com
+			// https://www.freehtmldesigns.com
 
 			$settings = maybe_unserialize( get_option( 'sahu_so_dashboard' ) );
 
 			return isset( $settings['sahu_so_status'] ) && '1' === $settings['sahu_so_status'];
 		} elseif ( defined( 'CSCS_GENEROPTION_PREFIX' ) ) {
 			// IgniteUp
-			// http://getigniteup.com
+			// https://getigniteup.com
 
 			return '1' === get_option( CSCS_GENEROPTION_PREFIX . 'enable', '' );
 		} elseif ( method_exists( 'UCP', 'is_construction_mode_enabled' ) ) {
@@ -203,7 +208,7 @@ class MonsterInsights_WP_Site_Health_Lite {
 			return UCP::is_construction_mode_enabled( true );
 		} elseif ( function_exists( 'mtnc_get_plugin_options' ) ) {
 			// Maintenance by WP Maintenance
-			// http://wordpress.org/plugins/maintenance/
+			// https://wordpress.org/plugins/maintenance/
 
 			$settings = mtnc_get_plugin_options( true );
 
@@ -392,6 +397,11 @@ class MonsterInsights_WP_Site_Health_Lite {
 	 * Checks if there are errors communicating with monsterinsights.com.
 	 */
 	public function test_check_connection() {
+		check_ajax_referer( 'health-check-site-status' );
+
+		if ( ! current_user_can( 'view_site_health_checks' ) ) {
+			wp_send_json_error();
+		}
 
 		$result = array(
 			'label'       => __( 'Can connect to MonsterInsights.com correctly', 'google-analytics-for-wordpress' ),
@@ -431,6 +441,11 @@ class MonsterInsights_WP_Site_Health_Lite {
 	 * Checks if there is a duplicate tracker.
 	 */
 	public function test_check_tracking_code() {
+		check_ajax_referer( 'health-check-site-status' );
+
+		if ( ! current_user_can( 'view_site_health_checks' ) ) {
+			wp_send_json_error();
+		}
 
 		$result = array(
 			'label'       => __( 'Tracking code is properly being output.', 'google-analytics-for-wordpress' ),
@@ -448,8 +463,8 @@ class MonsterInsights_WP_Site_Health_Lite {
 		if ( ! empty( $errors ) && is_array( $errors ) && ! empty( $errors[0] ) ) {
 			if ( $this->is_coming_soon_active() ) {
 				$result['status']      = 'good';
-				$result['label']       = __( 'Tracking code disabled: coming soon/maintenance mode plugin present', 'ga-premium' );
-				$result['description'] = __( 'MonsterInsights has detected that you have a coming soon or maintenance mode plugin currently activated on your site. This plugin does not allow other plugins (like MonsterInsights) to output Javascript, and thus MonsterInsights is not currently tracking your users (expected). Once the coming soon/maintenance mode plugin is deactivated, tracking will resume automatically.', 'ga-premium' );
+				$result['label']       = __( 'Tracking code disabled: coming soon/maintenance mode plugin present', 'google-analytics-for-wordpress' );
+				$result['description'] = __( 'MonsterInsights has detected that you have a coming soon or maintenance mode plugin currently activated on your site. This plugin does not allow other plugins (like MonsterInsights) to output Javascript, and thus MonsterInsights is not currently tracking your users (expected). Once the coming soon/maintenance mode plugin is deactivated, tracking will resume automatically.', 'google-analytics-for-wordpress' );
 			} else {
 				$result['status']      = 'critical';
 				$result['label']       = __( 'MonsterInsights has automatically detected an issue with your tracking setup', 'google-analytics-for-wordpress' );
@@ -462,4 +477,3 @@ class MonsterInsights_WP_Site_Health_Lite {
 }
 
 new MonsterInsights_WP_Site_Health_Lite();
-

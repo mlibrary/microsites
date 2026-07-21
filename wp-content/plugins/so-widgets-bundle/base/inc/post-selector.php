@@ -33,9 +33,12 @@ function siteorigin_widget_post_selector_process_query( $query, $exclude_current
 		}
 
 		// Filter out empty values to prevent deprecated warnings.
-		$query['post__in'] = array_filter( $query['post__in'], function( $value ) {
-			return ! empty( $value );
-		} );
+		$query['post__in'] = array_filter(
+			$query['post__in'],
+			function ( $value ) {
+				return ! empty( $value );
+			}
+		);
 
 		$query['post__in'] = array_map( 'intval', $query['post__in'] );
 	}
@@ -66,32 +69,59 @@ function siteorigin_widget_post_selector_process_query( $query, $exclude_current
 		}
 	}
 
-	if ( isset( $query['date_type'] ) && $query['date_type'] == 'relative' ) {
-		$date_query_rel = json_decode(
-			stripslashes( $query['date_query_relative'] ),
-			true
-		);
-		$value_after = new DateTime(
-			$date_query_rel['from']['value'] . ' ' . $date_query_rel['from']['unit'] . ' ago'
-		);
-		$value['after'] = $value_after->format( 'Y-m-d' );
-		$value_before = new DateTime(
-			$date_query_rel['to']['value'] . ' ' . $date_query_rel['to']['unit'] . ' ago'
-		);
-		$value['before'] = $value_before->format( 'Y-m-d' );
-		$query['date_query'] = $value;
+	if (
+		isset( $query['date_type'] ) &&
+		$query['date_type'] == 'relative' &&
+		! empty( $query['date_query_relative'] )
+	) {
+		// Check if we need to decode date_query_relative.
+		if ( ! is_array( $query['date_query_relative'] ) ) {
+			$date_query_rel = json_decode(
+				stripslashes( $query['date_query_relative'] ),
+				true
+			);
+		} else {
+			$date_query_rel = $query['date_query_relative'];
+		}
+
+		if (
+			! empty( $date_query_rel['from'] ) &&
+			is_array( $date_query_rel['from'] )
+		) {
+			$value_after = new DateTime(
+				$date_query_rel['from']['value'] . ' ' . $date_query_rel['from']['unit'] . ' ago'
+			);
+			$value['after'] = $value_after->format( 'Y-m-d' );
+		}
+
+		if (
+			! empty( $date_query_rel['to'] ) &&
+			is_array( $date_query_rel['to'] )
+		) {
+			$value_before = new DateTime(
+				$date_query_rel['to']['value'] . ' ' . $date_query_rel['to']['unit'] . ' ago'
+			);
+			$value['before'] = $value_before->format( 'Y-m-d' );
+		}
+
+		if ( ! empty( $value ) ) {
+			$query['date_query'] = $value;
+		}
 		unset( $query['date_type'] );
 		unset( $query['date_query_relative'] );
 	} elseif ( ! empty( $query['date_query'] ) ) {
 		$query['date_query'] = json_decode( stripslashes( $query['date_query'] ), true );
 	}
 
-	if ( ! empty( $query['date_query'] ) ) {
+	if (
+		! empty( $query['date_query'] ) &&
+		is_array( $query['date_query'] )
+	) {
 		$query['date_query']['inclusive'] = true;
 	}
 
 	if ( ! empty( $query['sticky'] ) ) {
-		switch( $query['sticky'] ) {
+		switch ( $query['sticky'] ) {
 			case 'ignore':
 				$query['ignore_sticky_posts'] = 1;
 				break;
@@ -119,9 +149,12 @@ function siteorigin_widget_post_selector_process_query( $query, $exclude_current
 		}
 
 		// Filter out empty values to prevent deprecated warnings.
-		$query['post__not_in'] = array_filter( $query['post__not_in'], function( $value ) {
-			return ! empty( $value );
-		} );
+		$query['post__not_in'] = array_filter(
+			$query['post__not_in'],
+			function ( $value ) {
+				return ! empty( $value );
+			}
+		);
 
 		$query['post__not_in'] = array_map( 'intval', $query['post__not_in'] );
 	}
@@ -152,19 +185,47 @@ function siteorigin_widget_post_selector_all_post_types() {
 }
 
 /**
- * Tells us how many posts this query has
+ * Counts the total number of posts matching a query.
  *
- * @return int
+ * This function processes a post selector query and returns the total
+ * count of matching posts. It handles special query parameters like 'offset'
+ * and 'posts_limit' to provide accurate counts:
+ * - When 'offset' is set, it subtracts the offset value from the total count.
+ * - When 'posts_limit' is set, it ensures the count doesn't exceed this limit.
+ *
+ * @param string|array $query The query string or array to process.
+ * @return int The number of posts matching the query.
  */
-function siteorigin_widget_post_selector_count_posts( $query ) {
+function siteorigin_widget_post_selector_count_posts( $query ): int {
 	$query = siteorigin_widget_post_selector_process_query( $query );
 
-	$posts = new WP_Query( $query );
+	$count_query = array_merge( $query, array(
+		'fields'                 => 'ids',
+		'posts_per_page'         => 1,
+		'no_found_rows'          => false, // Required to get found_posts.
+		'cache_results'          => false,
+		'update_post_meta_cache' => false,
+		'update_post_term_cache' => false,
+	) );
+
+	$posts = new WP_Query( $count_query );
+	$total = $posts->found_posts;
 
 	// WP Query doesn't reduce found_posts by the offset value, let's do that now.
 	if ( ! empty( $query['offset'] ) && is_numeric( $query['offset'] ) ) {
-		$total = max( $posts->found_posts - $query['offset'], 0 );
+		$total = max(
+			$total - $query['offset'],
+			0
+		);
 	}
 
-	return empty( $total ) ? $posts->found_posts : $total;
+	// If `posts_limit` is a valid number, limit the total number of posts.
+	if ( ! empty( $query['posts_limit'] ) ) {
+		$total = min(
+			$total,
+			(int) $query['posts_limit']
+		);
+	}
+
+	return $total;
 }

@@ -100,12 +100,12 @@ class MonsterInsights_Dashboard_Widget {
 			array( $this, 'dashboard_widget_content' )
 		);
 
-		// Attept to place the widget at the top.
+		// Attempt to place the widget at the top.
 		$normal_dashboard = $wp_meta_boxes['dashboard']['normal']['core'];
 		$widget_instance  = array( self::WIDGET_KEY => $normal_dashboard[ self::WIDGET_KEY ] );
 		unset( $normal_dashboard[ self::WIDGET_KEY ] );
 		$sorted_dashboard                             = array_merge( $widget_instance, $normal_dashboard );
-		$wp_meta_boxes['dashboard']['normal']['core'] = $sorted_dashboard;
+		$wp_meta_boxes['dashboard']['normal']['core'] = $sorted_dashboard; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Nothing to see here...
 	}
 
 	/**
@@ -136,18 +136,18 @@ class MonsterInsights_Dashboard_Widget {
 		?>
 		<div class="mi-dw-not-authed">
 			<?php
-			// Translators: Wizrd Link tag starts with url and Wizard link tag ends.
 			$message = sprintf(
+				/* translators: %1$s: Opening wizard link tag, %2$s: Closing wizard link tag. */
 				esc_html__( 'Your website analytics dashboard is not currently configured. Please use our %1$ssetup wizard%2$s to get started.', 'google-analytics-for-wordpress' ),
-				'<a href="' . esc_url( $url ) . '">',
+				'<a class="monsterinsights-setup-wizard-link">',
 				'</a>'
 			);
 			?>
 			<h2><?php echo $message; // phpcs:ignore ?></h2>
 			<?php if ( current_user_can( 'monsterinsights_save_settings' ) ) { ?>
 				<p><?php esc_html_e( 'To see your website stats, please connect MonsterInsights to Google Analytics.', 'google-analytics-for-wordpress' ); ?></p>
-				<a href="<?php echo esc_url( $url ); ?>"
-				   class="mi-dw-btn-large"><?php esc_html_e( 'Setup Website Analytics', 'google-analytics-for-wordpress' ); ?></a>
+				<a class="mi-dw-btn-large monsterinsights-setup-wizard-link"><?php esc_html_e( 'Setup Website Analytics', 'google-analytics-for-wordpress' ); ?></a>
+				<p><?php esc_html_e( 'Note: You will be transfered to MonsterInsights.com to complete the setup wizard.', 'google-analytics-for-wordpress' ); ?></p>
 			<?php } else { ?>
 				<p><?php esc_html_e( 'To see your website stats, please ask your site administrator to connect MonsterInsights to Google Analytics.', 'google-analytics-for-wordpress' ); ?></p>
 			<?php } ?>
@@ -161,27 +161,23 @@ class MonsterInsights_Dashboard_Widget {
 	 */
 	public function widget_scripts() {
 		$version_path = 'lite';
-		$rtl          = is_rtl() ? '.rtl' : '';
+		$screen       = get_current_screen();
 
-		$screen = get_current_screen();
 		if ( isset( $screen->id ) && 'dashboard' === $screen->id ) {
-			global $wp_version;
-			if ( ! defined( 'MONSTERINSIGHTS_LOCAL_WIDGET_JS_URL' ) ) {
-				wp_enqueue_style( 'monsterinsights-vue-style-vendors', plugins_url( $version_path . '/assets/vue/css/chunk-vendors' . $rtl . '.css', MONSTERINSIGHTS_PLUGIN_FILE ), array(), monsterinsights_get_asset_version() );
-				wp_enqueue_style( 'monsterinsights-vue-widget-style', plugins_url( $version_path . '/assets/vue/css/widget' . $rtl . '.css', MONSTERINSIGHTS_PLUGIN_FILE ), array(), monsterinsights_get_asset_version() );
-				wp_enqueue_script( 'monsterinsights-vue-vendors', plugins_url( $version_path . '/assets/vue/js/chunk-vendors.js', MONSTERINSIGHTS_PLUGIN_FILE ), array(), monsterinsights_get_asset_version(), true );
-				wp_enqueue_script( 'monsterinsights-vue-common', plugins_url( $version_path . '/assets/vue/js/chunk-common.js', MONSTERINSIGHTS_PLUGIN_FILE ), array(), monsterinsights_get_asset_version(), true );
-			} else {
-				wp_enqueue_script( 'monsterinsights-vue-vendors', MONSTERINSIGHTS_LOCAL_VENDORS_JS_URL, array(), monsterinsights_get_asset_version(), true );
-				wp_enqueue_script( 'monsterinsights-vue-common', MONSTERINSIGHTS_LOCAL_COMMON_JS_URL, array(), monsterinsights_get_asset_version(), true );
+			if ( ! defined( 'MONSTERINSIGHTS_LOCAL_JS_URL' ) ) {
+				MonsterInsights_Admin_Assets::enqueue_script_specific_css( 'src/modules/widget/widget.js' );
 			}
-			$widget_js_url = defined( 'MONSTERINSIGHTS_LOCAL_WIDGET_JS_URL' ) && MONSTERINSIGHTS_LOCAL_WIDGET_JS_URL ? MONSTERINSIGHTS_LOCAL_WIDGET_JS_URL : plugins_url( $version_path . '/assets/vue/js/widget.js', MONSTERINSIGHTS_PLUGIN_FILE );
-			wp_register_script( 'monsterinsights-vue-widget', $widget_js_url, array(), monsterinsights_get_asset_version(), true );
+			$widget_js_url = MonsterInsights_Admin_Assets::get_js_url( 'src/modules/widget/widget.js' );
+			wp_register_script( 'monsterinsights-vue-widget', $widget_js_url, array( 'wp-i18n' ), monsterinsights_get_asset_version(), true );
 			wp_enqueue_script( 'monsterinsights-vue-widget' );
 
-			$plugins           = get_plugins();
-			$wp_forms_url      = false;
-			$wpforms_installed = false;
+			$plugins                = get_plugins();
+			$wp_forms_url           = false;
+			$wpforms_installed      = false;
+			$userfeedback_url       = false;
+			$userfeedback_installed = false;
+			$formidableforms_installed = false;
+
 			if ( monsterinsights_can_install_plugins() ) {
 				$wpforms_key = 'wpforms-lite/wpforms.php';
 				if ( array_key_exists( $wpforms_key, $plugins ) ) {
@@ -189,6 +185,21 @@ class MonsterInsights_Dashboard_Widget {
 					$wpforms_installed = true;
 				} else {
 					$wp_forms_url = wp_nonce_url( self_admin_url( 'update.php?action=install-plugin&plugin=wpforms-lite' ), 'install-plugin_wpforms-lite' );
+				}
+
+				$userfeedback_keys     = array ( 'userfeedback-lite/userfeedback.php' => 1, 'userfeedback/userfeedback.php' => 2 );
+				$userfeedback_versions = array_intersect_key($userfeedback_keys, $plugins);
+
+				if ( ! empty( $userfeedback_versions ) ) {
+					$uf_plugin_key          = array_keys( $userfeedback_versions )[0];
+					$userfeedback_url       = wp_nonce_url( self_admin_url( 'plugins.php?action=activate&plugin=' . $uf_plugin_key ), 'activate-plugin_' . $uf_plugin_key );
+					$userfeedback_installed = true;
+				} else {
+					$userfeedback_url = wp_nonce_url( self_admin_url( 'update.php?action=install-plugin&plugin=userfeedback-lite' ), 'install-plugin_userfeedback-lite' );
+				}
+
+				if ( array_key_exists( 'formidable/formidable.php', $plugins ) ) {
+					$formidableforms_installed = true;
 				}
 			}
 
@@ -199,30 +210,41 @@ class MonsterInsights_Dashboard_Widget {
 				'monsterinsights-vue-widget',
 				'monsterinsights',
 				array(
-					'ajax'                => admin_url( 'admin-ajax.php' ),
-					'nonce'               => wp_create_nonce( 'mi-admin-nonce' ),
-					'network'             => is_network_admin(),
-					'translations'        => wp_get_jed_locale_data( monsterinsights_is_pro_version() ? 'ga-premium' : 'google-analytics-for-wordpress' ),
-					'assets'              => plugins_url( $version_path . '/assets/vue', MONSTERINSIGHTS_PLUGIN_FILE ),
-					'shareasale_id'       => monsterinsights_get_shareasale_id(),
-					'shareasale_url'      => monsterinsights_get_shareasale_url( monsterinsights_get_shareasale_id(), '' ),
-					'addons_url'          => is_multisite() ? network_admin_url( 'admin.php?page=monsterinsights_network#/addons' ) : admin_url( 'admin.php?page=monsterinsights_settings#/addons' ),
-					'widget_state'        => $this->get_options(),
-					'wpforms_enabled'     => function_exists( 'wpforms' ),
-					'wpforms_installed'   => $wpforms_installed,
-					'wpforms_url'         => $wp_forms_url,
-					'authed'              => $is_authed,
+					'ajax'                   => admin_url( 'admin-ajax.php' ),
+					'nonce'                  => wp_create_nonce( 'mi-admin-nonce' ),
+					'network'                => is_network_admin(),
+					'assets'                 => plugins_url( $version_path . '/assets/vue', MONSTERINSIGHTS_PLUGIN_FILE ),
+					'shareasale_id'          => monsterinsights_get_shareasale_id(),
+					'shareasale_url'         => monsterinsights_get_shareasale_url( monsterinsights_get_shareasale_id(), '' ),
+					'addons_url'             => is_multisite() ? network_admin_url( 'admin.php?page=monsterinsights_network#/addons' ) : admin_url( 'admin.php?page=monsterinsights_settings#/addons' ),
+					'widget_state'           => $this->get_options(),
+					'wpforms_enabled'        => function_exists( 'wpforms' ),
+					'wpforms_installed'      => $wpforms_installed,
+					'wpforms_url'            => $wp_forms_url,
+					'userfeedback_enabled'   => class_exists( 'UserFeedback_Base' ),
+					'userfeedback_installed' => $userfeedback_installed,
+					'userfeedback_url'       => $userfeedback_url,
+					'authed'                 => $is_authed,
 					// Used to add notices for future deprecations.
-					'versions'            => monsterinsights_get_php_wp_version_warning_data(),
-					'plugin_version'      => MONSTERINSIGHTS_VERSION,
-					'is_admin'            => true,
-					'reports_url'         => add_query_arg( 'page', 'monsterinsights_reports', admin_url( 'admin.php' ) ),
-					'getting_started_url' => is_multisite() ? network_admin_url( 'admin.php?page=monsterinsights_network#/about/getting-started' ) : admin_url( 'admin.php?page=monsterinsights_settings#/about/getting-started' ),
-					'wizard_url'          => admin_url( 'index.php?page=monsterinsights-onboarding' ),
+					'versions'               => monsterinsights_get_php_wp_version_warning_data(),
+					'plugin_version'         => MONSTERINSIGHTS_VERSION,
+					'is_admin'               => true,
+					'reports_url'            => add_query_arg( 'page', 'monsterinsights_reports', admin_url( 'admin.php' ) ),
+					'getting_started_url'    => is_multisite() ? network_admin_url( 'admin.php?page=monsterinsights_network#/about/getting-started' ) : admin_url( 'admin.php?page=monsterinsights_settings#/about/getting-started' ),
+					'wizard_url'             => admin_url( 'index.php?page=monsterinsights-onboarding' ),
+					'formidableforms_installed' => $formidableforms_installed,
 				)
 			);
 
 			$this->remove_conflicting_asset_files();
+
+			$text_domain = monsterinsights_get_plugin_textdomain();
+
+			wp_scripts()->add_inline_script(
+				'monsterinsights-vue-widget',
+				monsterinsights_get_printable_translations( $text_domain ),
+				'translation'
+			);
 		}
 	}
 
@@ -282,7 +304,7 @@ class MonsterInsights_Dashboard_Widget {
 			$this->options = self::wp_parse_args_recursive( get_user_meta( get_current_user_id(), 'monsterinsights_user_preferences', true ), self::$default_options );
 		}
 
-        // Set interval fixed to last30days on lite plugin.
+		// Set interval fixed to last30days on lite plugin.
 		$this->options['interval'] = 'last30days';
 
 		return apply_filters( 'monsterinsights_dashboard_widget_options', $this->options );

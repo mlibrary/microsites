@@ -5,6 +5,7 @@ Description: Build an impressive hero image section with custom content, buttons
 Author: SiteOrigin
 Author URI: https://siteorigin.com
 Documentation: https://siteorigin.com/widgets-bundle/hero-image-widget/
+Keywords: background, button, content, image, video
 */
 
 if ( ! class_exists( 'SiteOrigin_Widget_Base_Slider' ) ) {
@@ -45,6 +46,9 @@ class SiteOrigin_Widget_Hero_Widget extends SiteOrigin_Widget_Base_Slider {
 	}
 
 	public function get_widget_form() {
+		$units = siteorigin_widgets_get_measurements_list();
+		unset( $units[1] ); // Remove %;
+
 		return parent::widget_form( array(
 			'frames' => array(
 				'type' => 'repeater',
@@ -116,6 +120,16 @@ class SiteOrigin_Widget_Hero_Widget extends SiteOrigin_Widget_Base_Slider {
 										'has_background_image[show]: val',
 										'has_background_image[hide]: ! val',
 									),
+								),
+							),
+
+							'alt' => array(
+								'type' => 'text',
+								'label' => __( 'Image Alt Text', 'so-widgets-bundle' ),
+								'description' => __( 'Leave empty for decorative images.', 'so-widgets-bundle' ),
+								'state_handler' => array(
+									'has_background_image[show]' => array( 'show' ),
+									'has_background_image[hide]' => array( 'hide' ),
 								),
 							),
 
@@ -211,6 +225,7 @@ class SiteOrigin_Widget_Hero_Widget extends SiteOrigin_Widget_Base_Slider {
 							'height' => array(
 								'type' => 'measurement',
 								'label' => __( 'Height', 'so-widgets-bundle' ),
+								'units' => $units,
 							),
 
 							'padding' => array(
@@ -246,6 +261,7 @@ class SiteOrigin_Widget_Hero_Widget extends SiteOrigin_Widget_Base_Slider {
 							'height_responsive' => array(
 								'type' => 'measurement',
 								'label' => __( 'Height', 'so-widgets-bundle' ),
+								'units' => $units,
 							),
 
 							'padding' => array(
@@ -389,6 +405,7 @@ class SiteOrigin_Widget_Hero_Widget extends SiteOrigin_Widget_Base_Slider {
 		return array(
 			'color' => ! empty( $frame['background']['color'] ) ? $frame['background']['color'] : false,
 			'image' => ! empty( $background_image[0] ) ? $background_image[0] : false,
+			'image-alt' => ! empty( $frame['background']['alt'] ) ? $frame['background']['alt'] : '',
 			'image-width' => ! empty( $background_image[1] ) ? $background_image[1] : 0,
 			'image-height' => ! empty( $background_image[2] ) ? $background_image[2] : 0,
 			'image-sizing' => $frame['background']['image_type'],
@@ -495,7 +512,7 @@ class SiteOrigin_Widget_Hero_Widget extends SiteOrigin_Widget_Base_Slider {
 			if ( ! empty( $instance['layout']['desktop'] ) ) {
 				$settings = $instance['layout']['desktop'];
 
-				$meas_options['slide_height'] = ! empty( $settings['height'] ) ? $settings['height'] : '';
+				$meas_options['slide_height'] = ( ! empty( $settings['height'] ) && (float) $settings['height'] != 0 ) ? $settings['height'] : '';
 				$meas_options['slide_padding'] = ! empty( $settings['padding'] ) ? $settings['padding'] : '';
 				$meas_options['slide_padding_extra_top'] = ! empty( $settings['padding_extra_top'] ) ? $settings['padding_extra_top'] : '';
 				$meas_options['slide_padding_sides'] = ! empty( $settings['padding_sides'] ) ? $settings['padding_sides'] : '';
@@ -504,7 +521,7 @@ class SiteOrigin_Widget_Hero_Widget extends SiteOrigin_Widget_Base_Slider {
 
 			if ( ! empty( $instance['layout']['mobile'] ) ) {
 				$settings = $instance['layout']['mobile'];
-				$meas_options['slide_height_responsive'] = ! empty( $settings['height_responsive'] ) ? $settings['height_responsive'] : '';
+				$meas_options['slide_height_responsive'] = ( ! empty( $settings['height_responsive'] ) && (float) $settings['height_responsive'] != 0 ) ? $settings['height_responsive'] : '';
 
 				if ( isset( $settings['padding'] ) ) {
 					$meas_options['slide_padding_responsive'] = ! empty( $settings['padding'] ) ? $settings['padding'] : '0px';

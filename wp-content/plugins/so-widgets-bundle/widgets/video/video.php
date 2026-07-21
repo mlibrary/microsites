@@ -1,14 +1,22 @@
 <?php
-
 /*
 Widget Name: Video Player
 Description: Embed self-hosted or externally hosted videos with a customizable player, controls, and responsive sizing.
 Author: SiteOrigin
 Author URI: https://siteorigin.com
 Documentation: https://siteorigin.com/widgets-bundle/video-player-widget/
+Keywords: autoplay, embed, fullscreen, media, mp4, oembed, player, self-hosted, video file, video url, vimeo, youtube
 */
 
 class SiteOrigin_Widget_Video_Widget extends SiteOrigin_Widget {
+	private $skinnable_hosts = array(
+		'self' => true,
+		'youtube' => true,
+		'youtu' => true, // For shortened YouTube URLs (youtu.be).
+		'youtube-nocookie' => true,
+		'vimeo' => true
+	);
+
 	public function __construct() {
 		parent::__construct(
 			'sow-video',
@@ -134,10 +142,13 @@ class SiteOrigin_Widget_Video_Widget extends SiteOrigin_Widget {
 
 	public function enqueue_frontend_scripts( $instance ) {
 		$video_host = empty( $instance['host_type'] ) ? '' : $instance['host_type'];
+		$show_cover_on_end = $this->show_cover_on_end( $instance );
 
 		if ( $video_host == 'external' ) {
 			$video_host = ! empty( $instance['video']['external_video'] ) ? $this->get_host_from_url( $instance['video']['external_video'] ) : '';
 		}
+
+		$load_video_js = false;
 
 		if ( $this->is_skinnable_video_host( $video_host ) ) {
 			if ( $video_host == 'vimeo' && ! wp_script_is( 'froogaloop' ) ) {
@@ -154,28 +165,30 @@ class SiteOrigin_Widget_Video_Widget extends SiteOrigin_Widget {
 			}
 
 			if (
-				! wp_style_is( 'wp-mediaelement' ) &&
-				(
-					empty( $instance['playback']['hide_controls'] ) ||
-					$instance['playback']['hide_controls'] == false
-				)
+				$video_host !== 'self' ||
+				! empty( $instance['playback']['hide_controls'] ) ||
+				$show_cover_on_end
 			) {
-				wp_enqueue_style( 'wp-mediaelement' );
-			}
-
-			if ( ! wp_script_is( 'so-video-widget' ) ) {
-				wp_enqueue_script(
-					'so-video-widget',
-					plugin_dir_url( __FILE__ ) . 'js/so-video-widget' . SOW_BUNDLE_JS_SUFFIX . '.js',
-					array( 'jquery', 'mediaelement' ),
-					SOW_BUNDLE_VERSION
-				);
-			}
-
-			if ( ! empty( $instance['playback']['fitvids'] ) && ! wp_script_is( 'jquery-fitvids' ) ) {
-				wp_enqueue_script( 'jquery-fitvids' );
+				$load_video_js = true;
 			}
 		}
+
+		if ( ! empty( $instance['playback']['fitvids'] ) ) {
+			$load_video_js = true;
+			wp_enqueue_script( 'jquery-fitvids' );
+		}
+
+		if ( $load_video_js ) {
+			wp_enqueue_script(
+				'so-video-widget',
+				plugin_dir_url( __FILE__ ) . 'js/so-video-widget' . SOW_BUNDLE_JS_SUFFIX . '.js',
+				array( 'jquery', 'mediaelement' ),
+				SOW_BUNDLE_VERSION
+			);
+
+			wp_enqueue_style( 'mediaelement' );
+		}
+
 		parent::enqueue_frontend_scripts( $instance );
 	}
 
@@ -232,19 +245,51 @@ class SiteOrigin_Widget_Video_Widget extends SiteOrigin_Widget {
 			}
 		}
 
+		$hide_controls = ! empty( $instance['playback']['hide_controls'] );
+
+		if ( $instance['host_type'] === 'self' ) {
+			$hide_controls = apply_filters( 'sow_video_add_controls', $hide_controls );
+		} else {
+			$hide_controls = $instance['playback']['oembed'];
+		}
+
+		// Account for self hosted videos that are actually embedding external videos.
+		if ( $video_host === 'self' && ! empty( $self_sources ) ) {
+			$skin_video = true;
+
+			$has_local_videos = array_filter( $self_sources, function( $source ) {
+				return ! empty( $source['video_type'] ) && ! empty( $source['src'] );
+			} );
+
+			if ( ! $has_local_videos ) {
+				// The media picker was not used, and there are external video sources.
+				// Let's check if there's any embeds present.
+				$has_embeds = array_filter( $self_sources, function( $source ) {
+					return in_array( $this->get_host_from_url( $source['src'] ), array_keys( $this->skinnable_hosts ) );
+				} );
+
+				if ( $has_embeds ) {
+					$external_src = ! $self_sources[0]['src'] ? false : $self_sources[0]['src'];
+				}
+			}
+		} else {
+			$skin_video = $this->is_skinnable_video_host( $video_host );
+		}
+
 		$return = array(
 			'player_id'               => 'sow-player-' . ( $player_id ++ ),
 			'host_type'               => $instance['host_type'],
 			'src'                     => $external_src,
 			'sources'                 => $self_sources,
 			'video_type'              => $external_video_type,
-			'is_skinnable_video_host' => $this->is_skinnable_video_host( $video_host ),
+			'is_skinnable_video_host' => $skin_video,
 			'poster'                  => $poster,
 			'autoplay'                => ! empty( $instance['playback']['autoplay'] ),
 			'loop'                    => ! empty( $instance['playback']['loop'] ),
 			'skin_class'              => 'default',
 			'fitvids'                 => ! empty( $instance['playback']['fitvids'] ),
-			'show_controls'           => isset( $instance['playback']['hide_controls'] ) ? $instance['playback']['hide_controls'] : false,
+			'hide_controls'           => $hide_controls,
+			'show_cover_on_end'       => $this->show_cover_on_end( $instance ),
 		);
 
 		if ( $instance['host_type'] == 'external' && $instance['playback']['oembed'] ) {
@@ -267,19 +312,41 @@ class SiteOrigin_Widget_Video_Widget extends SiteOrigin_Widget {
 	}
 
 	/**
-	 * Check if the current host is skinnable
+	 * Check if the current host is skinnable.
+	 *
+	 * @return bool True if the host is skinnable, false otherwise.
+	 */
+	private function is_skinnable_video_host( $video_host ) {
+		return isset( $this->skinnable_hosts[ $video_host ] );
+	}
+
+	/**
+	 * Determine if the cover image should be restored when a self-hosted video ends.
+	 *
+	 * @param array $instance The widget instance settings.
 	 *
 	 * @return bool
 	 */
-	private function is_skinnable_video_host( $video_host ) {
-		global $wp_version;
+	private function show_cover_on_end( $instance ) {
+		if ( empty( $instance['host_type'] ) || $instance['host_type'] !== 'self' ) {
+			return false;
+		}
 
-		return $video_host == 'self' || ( ( $video_host == 'youtube' || $video_host == 'vimeo' ) && $wp_version >= 4.2 );
+		return (bool) apply_filters( 'sow_video_show_cover_on_end', false, $instance );
 	}
 
 	public function get_less_variables( $instance ) {
 		if ( empty( $instance ) ) {
 			return array();
+		}
+
+		$video_host = empty( $instance['host_type'] ) ? '' : $instance['host_type'];
+
+		// Hide controls isn't a setting for external videos.
+		if ( $video_host === 'external' ) {
+			return array(
+				'hide_controls' => true,
+			);
 		}
 
 		return array(

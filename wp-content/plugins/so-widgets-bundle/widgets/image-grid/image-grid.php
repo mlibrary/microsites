@@ -5,6 +5,7 @@ Description: Showcase images in a responsive grid layout with custom size, spaci
 Author: SiteOrigin
 Author URI: https://siteorigin.com
 Documentation: https://siteorigin.com/widgets-bundle/image-grid/
+Keywords: image, photo, gallery, media, showcase
 */
 
 class SiteOrigin_Widgets_ImageGrid_Widget extends SiteOrigin_Widget {
@@ -263,10 +264,7 @@ class SiteOrigin_Widgets_ImageGrid_Widget extends SiteOrigin_Widget {
 	}
 
 	public function get_template_variables( $instance, $args ) {
-		$images = isset( $instance['images'] ) ? $instance['images'] : array();
-
-		// If WordPress 5.9 or higher is being used, let WordPress control if Lazy Load is enabled.
-		$lazy = function_exists( 'wp_lazy_loading_enabled' ) && wp_lazy_loading_enabled( 'img', 'sow-image-grid' );
+		$images = isset( $instance['images'] ) ? (array) $instance['images'] : array();
 
 		foreach ( $images as $id => &$image ) {
 			if ( empty( $image['image'] ) && empty( $image['image_fallback'] ) ) {
@@ -292,7 +290,7 @@ class SiteOrigin_Widgets_ImageGrid_Widget extends SiteOrigin_Widget {
 				$image['image_html'] = '<img ';
 				foreach ( $attr as $n => $v ) {
 					if ( $n === 'alt' || ! empty( $v ) ) {
-						$image['image_html'] .= esc_html( $n ) . '="' . esc_attr( $v ) . '" ';
+						$image['image_html'] .= siteorigin_sanitize_attribute_key( $n ) . '="' . esc_attr( $v ) . '" ';
 					}
 				}
 				$image['image_html'] .= '>';

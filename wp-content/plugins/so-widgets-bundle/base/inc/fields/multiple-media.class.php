@@ -86,15 +86,15 @@ class SiteOrigin_Widget_Field_Multiple_Media extends SiteOrigin_Widget_Field_Bas
 		}
 		?>
 		<div class="multiple-media-field-wrapper">
-			<a
-				href="#"
-				class="button"
+			<button
+				type="button"
+				class="button-secondary"
 				data-choose="<?php echo esc_attr( $this->choose ); ?>"
 				data-update="<?php echo esc_attr( $this->update ); ?>"
 				data-library="<?php echo esc_attr( $this->library ); ?>"
 			>
 				<?php echo esc_html( $this->choose ); ?>
-			</a>
+			</button>
 
 			<?php if ( empty( $this->repeater ) ) { ?>
 				<div class="multiple-media-field-items">
@@ -160,7 +160,12 @@ class SiteOrigin_Widget_Field_Multiple_Media extends SiteOrigin_Widget_Field_Bas
 			return array();
 		}
 
-		$value = explode( ',', $value );
+		// Fresh form input is a CSV string, but the stored value is already an
+		// array of ints. Accept both shapes so re-saving doesn't pass an array
+		// to explode() (a TypeError on PHP 8).
+		if ( ! is_array( $value ) ) {
+			$value = explode( ',', $value );
+		}
 		$media = array();
 
 		foreach ( $value as $item ) {

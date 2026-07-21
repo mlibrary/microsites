@@ -74,6 +74,12 @@
 			.sow-accordion-title {
 				display: flex;
 				align-items: center;
+				margin: 0;
+				color: inherit;
+				font-family: inherit;
+				font-size: inherit;
+				font-weight: inherit;
+				line-height: inherit;
 				& when ( @heading_title_align = center ) {
 					justify-content: center;
 				}
@@ -97,9 +103,17 @@
 			}
 
 			.sow-accordion-icon-image {
-				width: auto;
-				height: @heading_title_font_size;
-				max-height: 1em; // Account for @heading_title_font_size not being set
+
+				& when ( @heading_title_font_size = default ) {
+					max-height: 1em;
+				}
+
+				&:not(.sow-accordion-icon-image-custom),
+				&:not([width]),
+				&:not([width]) {
+					height: @heading_title_font_size;
+					width: auto;
+				}
 			}
 
 			.sow-accordion-title-icon-left > .sow-accordion-icon-image,

@@ -2,23 +2,26 @@
 
 ( function( $ ) {
 
-	$( document ).on( 'sowsetupformfield', '.siteorigin-widget-field-type-autocomplete', function( e ) {
-		var $$ = $( this );
-		var $contentSelector = $$.find(' .existing-content-selector' );
+	const setupAutocompleteField = function( e ) {
+		const $$ = $( this );
 
 		if ( $$.data( 'initialized' ) ) {
 			return;
 		}
 
-		var getSelectedItems = function() {
-			var selectedItems = $$.find( 'input.siteorigin-widget-input' ).val();
+		const $contentSelector = $$.find(' .existing-content-selector' );
+
+		const postId = parseInt( jQuery( '#post_ID' ).val() );
+
+		const getSelectedItems = function() {
+			const selectedItems = $$.find( 'input.siteorigin-widget-input' ).val();
 			return selectedItems.length === 0 ? [] : selectedItems.split( ',' );
 		};
 
-		var updateSelectedItems = function() {
-			var selectedItems = getSelectedItems();
+		const updateSelectedItems = function() {
+			const selectedItems = getSelectedItems();
 			$$.find( 'ul.items > li' ).each( function( index, element ) {
-				var $li = $( this );
+				const $li = $( this );
 
 				if ( selectedItems.indexOf( $li.data( 'value' ) ) > -1 ) {
 					$li.addClass( 'selected' );
@@ -28,17 +31,24 @@
 			} );
 		};
 
-		var request = null;
-		var refreshList = function() {
+		const $itemList = $$.find( 'ul.items' );
+		const $noResults = $$.find( '.content-no-results' );
+		let request = null;
+		const refreshList = () => {
 			if ( request !== null ) {
 				request.abort();
 			}
 
-			var $contentSearchInput = $$.find( '.content-text-search' );
-			var query = $contentSearchInput.val();
-			var source = $contentSearchInput.data( 'source' );
-			var postTypes = $contentSearchInput.data( 'postTypes' );
-			var ajaxData = { action: 'so_widgets_search_' + source };
+			const $contentSearchInput = $$.find( '.content-text-search' );
+			const query = $contentSearchInput.val();
+			const source = $contentSearchInput.data( 'source' );
+			const postTypes = $contentSearchInput.data( 'postTypes' );
+			const ajaxParams = $contentSearchInput.data( 'ajaxParams' );
+			const ajaxData = {
+				action: 'so_widgets_search_' + source,
+				postId: postId,
+			};
+
 			if ( source === 'posts' ) {
 				ajaxData.query = query;
 				ajaxData.postTypes = postTypes;
@@ -46,36 +56,57 @@
 				ajaxData.term = query;
 			}
 
+			if ( ajaxParams && typeof ajaxParams === 'object' && ! Array.isArray( ajaxParams ) ) {
+				Object.assign( ajaxData, ajaxParams );
+				ajaxData.action = 'so_widgets_search_' + source;
+			}
+
 			// If WPML is enabled for this page, include page language for filtering.
 			if ( typeof icl_this_lang == 'string' ) {
 				ajaxData.language = icl_this_lang;
 			}
 
-			var $ul = $$.find( 'ul.items' ).empty().addClass( 'loading' );
+			// Visually prep the field.
+			$noResults.addClass( 'hidden' );
+			$itemList.empty();
+			$itemList.removeClass( 'hidden' )
+			$itemList.addClass( 'loading' );
+
 			return $.get(
-				soWidgets.ajaxurl,
+				window.top.soWidgets.ajaxurl,
 				ajaxData,
-				function( results ) {
-					results.forEach( function( item ) {
+				( results ) => {
+					// If there aren't any results, show a message.
+					if ( results.length === 0 ) {
+						$noResults.removeClass( 'hidden' );
+						$itemList.addClass( 'hidden' );
+						$itemList.removeClass( 'loading' );
+						return;
+					}
+
+
+					results.forEach( ( item ) => {
 						if ( item.label === '' ) {
 							item.label = '&nbsp;';
 						}
 						// Add all the items.
-						$ul.append(
+						$itemList.append(
 							$( '<li>' )
 								.html( item.label + '<span>(' + item.type + ')</span>' )
 								.data( item )
 						);
 					} );
-					$ul.removeClass( 'loading' );
+					$itemList.removeClass( 'loading' );
 				}
 			);
 		};
 
-		$$.find( '.siteorigin-widget-autocomplete-input' ).on( 'click', function() {
+		$$.find( '.siteorigin-widget-autocomplete-input' ).on( 'click', () => {
+			$noResults.addClass( 'hidden' );
+			$itemList.show();
 			$contentSelector.show();
 
-			var refreshPromise = new $.Deferred();
+			let refreshPromise = new $.Deferred();
 			if( $contentSelector.is( ':visible' ) && $contentSelector.find( 'ul.items li' ).length === 0 ) {
 				refreshPromise = refreshList();
 			} else {
@@ -85,12 +116,12 @@
 			refreshPromise.done( updateSelectedItems );
 		} );
 
-		var closeContent = function() {
+		const closeContent = function() {
 			$contentSelector.hide();
 		};
 
 		$( window ).on( 'mousedown', function( event ) {
-			var mouseDownOutside = $$.find( event.target ).length === 0;
+			const mouseDownOutside = $$.find( event.target ).length === 0;
 			if ( mouseDownOutside ) {
 				closeContent();
 			}
@@ -105,14 +136,14 @@
 			if ( e.type == 'keyup' && ! window.sowbForms.isEnter( e ) ) {
 				return;
 			}
-			var $input = $$.find( 'input.siteorigin-widget-input' );
-			var $li = $( this );
-			var clickedItem = $li.data( 'value' );
+			const $input = $$.find( 'input.siteorigin-widget-input' );
+			const $li = $( this );
+			const clickedItem = $li.data( 'value' );
 
 			if ( $contentSelector.data( 'multiple' ) ) {
-				var selectedItems = getSelectedItems();
+				const selectedItems = getSelectedItems();
 
-				var curIndex = selectedItems.indexOf( clickedItem );
+				const curIndex = selectedItems.indexOf( clickedItem );
 
 				if ( curIndex > -1 ) {
 					selectedItems.splice( curIndex, 1 );
@@ -120,7 +151,7 @@
 				} else {
 					selectedItems.push( clickedItem );
 					$li.addClass( 'selected' );
-				}				
+				}
 				$input.val( selectedItems.join( ',' ) );
 			} else {
 				$li.parent().find( '.selected' ).removeClass( 'selected' );
@@ -131,7 +162,7 @@
 			$input.trigger( 'change' );
 		} );
 
-		var interval = null;
+		let interval = null;
 		$$.find( '.content-text-search' ).on( 'keyup', function() {
 			if( interval !== null ) {
 				clearTimeout( interval );
@@ -143,6 +174,25 @@
 		} );
 
 		$$.data( 'initialized', true );
-	} );
+	}
 
+	 // If the current page isn't the site editor, set up the Autocomplete field now.
+	 if (
+		 window.top === window.self &&
+		 (
+			 typeof pagenow === 'string' &&
+			 pagenow !== 'site-editor'
+		 )
+	 ) {
+		 $( document ).on( 'sowsetupformfield', '.siteorigin-widget-field-type-autocomplete', setupAutocompleteField );
+	 }
+
+	// Add support for the Site Editor.
+	window.addEventListener( 'message', function( e ) {
+		if ( e.data && e.data.action === 'sowbBlockFormInit' ) {
+			$( '.siteorigin-widget-field-type-autocomplete' ).each( function() {
+				setupAutocompleteField.call( this );
+			} );
+		}
+	} );
 } )( jQuery );

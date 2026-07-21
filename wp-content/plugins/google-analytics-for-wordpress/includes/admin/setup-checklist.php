@@ -1,4 +1,9 @@
 <?php
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Full setup checklist functionality here.
  *
@@ -19,6 +24,7 @@ class MonsterInsights_Setup_Checklist {
 			$this,
 			'ajax_button_click_track'
 		) );
+		add_action( 'wp_ajax_monsterinsights_generate_setup_wizard_url', array( $this, 'ajax_generate_setup_wizard_url' ) );
 	}
 
 	/**
@@ -60,10 +66,13 @@ class MonsterInsights_Setup_Checklist {
 			'step_2_google_search_console'   => false,
 			'step_2_form_conversion'         => false,
 			'step_2_visit_overview_report'   => false,
+			'step_2_create_custom_view'      => false,
 			'step_3_create_site_note'        => false,
 			'step_4_install_userfeedback'    => false,
 			'step_4_performance_addon'       => false,
 			'step_4_custom_dimensions'       => false,
+			'step_4_install_wpconsent'       => false,
+			'step_4_custom_events'           => false,
 			'step_5_check_out_growth_tools'  => false,
 			'step_5_embed_popular_posts'     => false,
 			'step_5_install_aioseo'          => false,
@@ -233,6 +242,10 @@ class MonsterInsights_Setup_Checklist {
 			$checklist['step_4_custom_dimensions'] = true;
 		}
 
+		if ( function_exists( 'WPConsent' ) ) {
+			$checklist['step_4_install_wpconsent'] = true;
+		}
+
 		if ( function_exists( 'aioseo' ) ) {
 			$checklist['step_5_install_aioseo'] = true;
 		}
@@ -309,6 +322,27 @@ class MonsterInsights_Setup_Checklist {
 		}
 
 		return 'step_6';
+	}
+
+	/**
+	 * Generate and return the setup wizard URL
+	 *
+	 * @return void
+	 */
+	public function ajax_generate_setup_wizard_url() {
+		check_ajax_referer( 'mi-admin-nonce', 'nonce' );
+
+		if ( ! current_user_can( 'monsterinsights_save_settings' ) ) {
+			wp_send_json_error( array(
+				'message' => esc_html__( 'You don\'t have permission to perform this action.', 'google-analytics-for-wordpress' ),
+			) );
+		}
+		// Use the existing function to get the onboarding URL
+		$onboarding_url = monsterinsights_get_onboarding_url();
+
+		wp_send_json_success( array(
+			'wizard_url' => esc_url_raw( $onboarding_url ),
+		) );
 	}
 
 }

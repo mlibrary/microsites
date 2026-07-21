@@ -5,6 +5,7 @@ Description: Automatically display the taxonomies of the current post with custo
 Author: SiteOrigin
 Author URI: https://siteorigin.com
 Documentation: https://siteorigin.com/widgets-bundle/taxonomy-widget/
+Keywords: category, meta, tag
 */
 
 class SiteOrigin_Widget_Taxonomy_Widget extends SiteOrigin_Widget {
@@ -15,6 +16,7 @@ class SiteOrigin_Widget_Taxonomy_Widget extends SiteOrigin_Widget {
 			array(
 				'description' => __( 'Automatically display the taxonomies of the current post with customizable labels, colors, and link settings.', 'so-widgets-bundle' ),
 				'help' => 'https://siteorigin.com/widgets-bundle/taxonomy-widget/',
+				'has_preview' => false,
 			),
 			array(),
 			false,

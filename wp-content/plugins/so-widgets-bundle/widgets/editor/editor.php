@@ -2,8 +2,10 @@
 /*
 Widget Name: Editor
 Description: Insert and customize content with a rich text editor offering extensive formatting options.
+Author: SiteOrigin
 Author URI: https://siteorigin.com
 Documentation: https://siteorigin.com/widgets-bundle/editor-widget/
+Keywords: content, formatting, richtext, text, tinymce, toolbar
 */
 
 class SiteOrigin_Widget_Editor_Widget extends SiteOrigin_Widget {
@@ -19,8 +21,6 @@ class SiteOrigin_Widget_Editor_Widget extends SiteOrigin_Widget {
 			false,
 			plugin_dir_path( __FILE__ )
 		);
-
-		add_filter( 'siteorigin_widgets_sanitize_instance_sow-editor', array( $this, 'add_noreferrer_to_link_targets' ) );
 	}
 
 	public function get_widget_form() {
@@ -140,7 +140,7 @@ class SiteOrigin_Widget_Editor_Widget extends SiteOrigin_Widget {
 				if ( ! empty( $matches[1] ) ) {
 					$more_link_text = strip_tags( wp_kses_no_null( trim( $matches[1] ) ) );
 				} else {
-					$more_link_text = __( 'Read More', 'siteorigin-panels' );
+					$more_link_text = __( 'Read More', 'so-widgets-bundle' );
 				}
 				$more_link = apply_filters( 'the_content_more_link', ' <a href="' . get_permalink() . "#more-{$post->ID}\" class=\"more-link\">$more_link_text</a>", $more_link_text );
 				$content .= '<p>' . $more_link . '</p>';
@@ -148,17 +148,6 @@ class SiteOrigin_Widget_Editor_Widget extends SiteOrigin_Widget {
 		}
 
 		return $content;
-	}
-
-	public function add_noreferrer_to_link_targets( $instance ) {
-		if (
-			function_exists( 'wp_targeted_link_rel' ) &&
-			! empty( $instance['text'] )
-		) {
-			$instance['text'] = wp_targeted_link_rel( $instance['text'] );
-		}
-
-		return $instance;
 	}
 
 	public function get_style_name( $instance ) {

@@ -1,8 +1,8 @@
 {
-  "name": "publishpress/capability-manager-enhanced",
+  "name": "publishpress/publishpress-capabilities",
   "type": "wordpress-plugin",
   "description": "",
-  "license": "GPL-2",
+  "license": "GPL-2.0-or-later",
   "authors": [
     {
       "name": "PublishPress",
@@ -10,31 +10,32 @@
     }
   ],
   "config": {
-    "preferred-install": "dist"
+    "preferred-install": {
+      "*": "dist"
+    },
+    "allow-plugins": {
+      "publishpress/dev-workspace": true,
+      "php-http/discovery": true,
+      "dealerdirect/phpcodesniffer-composer-installer": true,
+      "phpstan/extension-installer": true
+    },
+    "process-timeout": 0
   },
   "minimum-stability": "stable",
+  "prefer-stable": true,
   "require": {
-    "php": ">=5.6.20",
-    "psr/container": "1.0.0",
-    "pimple/pimple": "3.2.3.*",
-    "publishpress/wordpress-reviews": "^1.1",
-    "publishpress/wordpress-version-notices": "^1",
-    "publishpress/wordpress-banners": "^1.2",
-    "publishpress/publishpress-instance-protection": "1.0.2"
+    "php": ">=7.2.5"
   },
-  "repositories": [
-    {
-      "type": "git",
-      "url": "https://github.com/publishpress/publishpress-instance-protection"
-    }
-  ],
-  "scripts": {
-    "build": "builder/docker/scripts/build build",
-    "build-unpacked": "builder/docker/scripts/build build-dir"
+  "require-dev": {
+    "publishpress/dev-workspace": "^1.0"
   },
   "extra": {
-    "plugin-name": "capability-manager-enhanced",
+    "plugin-name": "publishpress-capabilities",
     "plugin-slug": "capsman-enhanced",
-    "plugin-folder": "capability-manager-enhanced"
+    "plugin-folder": "capability-manager-enhanced",
+    "version-constant": "PUBLISHPRESS_CAPS_VERSION",
+    "plugin-lang-domain": "capability-manager-enhanced",
+    "plugin-github-repo": "publishpress/publishpress-capabilities",
+    "plugin-composer-package": "publishpress/publishpress-capabilities"
   }
 }

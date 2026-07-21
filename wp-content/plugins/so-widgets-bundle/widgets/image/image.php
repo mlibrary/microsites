@@ -5,6 +5,7 @@ Description: Add a responsive image with custom dimensions, positioning, caption
 Author: SiteOrigin
 Author URI: https://siteorigin.com
 Documentation: https://siteorigin.com/widgets-bundle/image-widget-documentation/
+Keywords: caption, photo
 */
 
 class SiteOrigin_Widget_Image_Widget extends SiteOrigin_Widget {
@@ -218,7 +219,15 @@ class SiteOrigin_Widget_Image_Widget extends SiteOrigin_Widget {
 	}
 
 	public function get_style_hash( $instance ) {
-		return substr( md5( serialize( $this->get_less_variables( $instance ) ) ), 0, 12 );
+		$less_variables = $this->get_less_variables( $instance );
+		$less_variables = apply_filters(
+			'siteorigin_widgets_less_variables_' . $this->id_base,
+			$less_variables,
+			$instance,
+			$this
+		);
+
+		return substr( md5( serialize( $less_variables ) ), 0, 12 );
 	}
 
 	public function get_template_variables( $instance, $args ) {
@@ -241,8 +250,8 @@ class SiteOrigin_Widget_Image_Widget extends SiteOrigin_Widget {
 
 		if ( ! empty( $instance['size_external'] ) && $instance['size_external'] == 'custom_size' ) {
 			$external_size = array(
-				'width' => $instance['size_external_width'],
-				'height' => $instance['size_external_height'],
+				'width'  => ! empty( $instance['size_external_width'] )  ? $instance['size_external_width']  : '',
+				'height' => ! empty( $instance['size_external_height'] ) ? $instance['size_external_height'] : '',
 			);
 		}
 
@@ -278,7 +287,12 @@ class SiteOrigin_Widget_Image_Widget extends SiteOrigin_Widget {
 			}
 
 			if ( ! empty( $custom_size ) && ! empty( $instance['size_enforce'] ) ) {
-				$attr['style'] = 'width: ' . (int) $attr['width'] . 'px; height: '.  (int) $attr['height'] . 'px;';
+				$enforce_width = ! empty( $attr['width'] ) ? $attr['width'] : ( ! empty( $instance['size_width'] ) ? $instance['size_width'] : 0 );
+				$enforce_height = ! empty( $attr['height'] ) ? $attr['height'] : ( ! empty( $instance['size_height'] ) ? $instance['size_height'] : 0 );
+
+				if ( ! empty( $enforce_width ) && ! empty( $enforce_height ) ) {
+					$attr['style'] = 'width: ' . (int) $enforce_width . 'px; height: '.  (int) $enforce_height . 'px;';
+				}
 			}
 		}
 		$attr = apply_filters( 'siteorigin_widgets_image_attr', $attr, $instance, $this );
@@ -387,7 +401,7 @@ class SiteOrigin_Widget_Image_Widget extends SiteOrigin_Widget {
 			<?php
 			foreach ( $link_attributes as $attr => $val ) {
 				if ( ! empty( $val ) ) {
-					echo esc_html( $attr ) . '="' . esc_attr( $val ) . '" ';
+					echo siteorigin_sanitize_attribute_key( $attr ) . '="' . esc_attr( $val ) . '" ';
 				}
 			}
 		?>

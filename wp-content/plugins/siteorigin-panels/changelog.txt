@@ -1,5 +1,198 @@
 == Changelog ==
 
+= 2.35.0 – 15 July 2026 =
+* Layout Block: Strengthened save-time security so widget content is verified when saved and rendered from a trusted copy, keeping embeds and other advanced content intact for all visitors.
+* Layout Block: Extended the same save-time verification to reusable blocks and block-based widget areas.
+* Recommended alongside Widgets Bundle 1.74.0 or later for full compatibility.
+
+= 2.34.5 – 01 July 2026 =
+* Embedded Video: Preserved the stored video value on save when unchanged, so untouched widgets are no longer rewritten.
+
+= 2.34.4 – 25 June 2026 =
+* Lazy Load: Skipped lazy-load tagging on the style wrapper when an overlay is present to prevent duplicate images.
+* Visual Styles: Matched color picker controls to 28px for consistent sizing.
+* Restored post globals after admin and preview renders to prevent loop variables leaking into the page.
+* Always sanitize widget data on save to harden against stored cross-site scripting.
+
+= 2.34.3 – 22 May 2026 =
+* Style Fields: Restored input and select sizing in Page Builder style settings.
+
+= 2.34.2 – 20 May 2026 =
+* Code Tab: Fixed the widget dialog font family regression.
+* Customizer: Fixed dialog font family scoping to prevent Dashicons conflicts.
+* Layout Block: Fixed column resizing crashes and inflated row minimum heights in iframe-based editors.
+* Yoast SEO: Improved sitemap image handling to respect Yoast image filters.
+* Updated the WordPress Tested up to tag to 7.0.
+
+= 2.34.1 – 15 April 2026 =
+* Copy Content: Fixed slug corruption during save caused by slug uniqueness filters.
+* Ditty: Added compatibility to prevent UI conflicts on Page Builder admin screens.
+* Events Manager: Fixed publish status regression in the compatibility layer.
+* Layout Block: Added iframe support for the WordPress 7 block editor.
+* Layout Block: Fixed context menu rendering inside the block editor iframe.
+* Layout Block: Fixed inline save persistence.
+* Layout Block: Fixed toolbar focus rendering and selection ring overlap.
+* Layout Block: Fixed dialog and block styling for WordPress 7.
+* WooCommerce: Improved Shop page context guard to prevent content handling regressions.
+* Fixed admin control sizing for WordPress 7.
+* Fixed iOS scrolling issue with full-width rows by using `overflow-x: clip`.
+* Fixed last row bottom spacing.
+* Fixed row preview percentage alignment.
+* Improved admin asset conflict handling for compatibility modules.
+
+= 2.34.0 – 21 February 2026 =
+* ACF: Improved widget compatibility for array return format.
+* AIOSEO, Layout Block: Prevented the AIOSEO SiteOrigin integration from loading in the Layout Block editor.
+* Events Manager: Fixed query context handling and duplication processing to prevent duplicate output and preserve Page Builder data.
+* Security: Hardened post loop template resolution to prevent local file inclusion risks.
+* WooCommerce: Prevented Shop page content from leaking into Terms and Conditions content rendering.
+* Added a setting to display empty columns with backgrounds in responsive layouts.
+
+= 2.33.5 – 07 January 2026 =
+* Added contextual menu action hooks for row and widget menus.
+
+= 2.33.4 – 03 December 2025 =
+* Updated Tested up to tag.
+
+= 2.33.3 – 07 October 2025 =
+* Accessibility: Improved the screen-reader-only helper to prevent visible text flashes.
+* Builder Widget: Refreshed panels data when opening nested dialogs to avoid unexpected change notices.
+* Localization: Corrected escaping in admin settings and widget field templates so translated labels render as expected.
+* Select2: Prevented duplicate script registration and raised the dropdown z-index to keep the picker usable in dialogs.
+
+= 2.33.2 – 02 September 2025 =
+* Livemesh Compat: Added SiteOrigin Widgets compatibility.
+* Added Blueprint.json for WP.org Live Preview functionality.
+* Build Config: Updated WordPress.org asset exclusion path.
+
+= 2.33.1 – 31 July 2025 =
+* Layout Directory: Fixed pagination and search functionality.
+* Layouts: Fixed an issue with cloning layouts.
+* Layouts: Improved security by checking nonce earlier when fetching prebuilt layouts.
+
+= 2.33.0 – 29 July 2025 =
+* Layout Directory: Added category and niche filtering, search functionality, and pagination support.
+* Mode Switcher: Hidden when parent dialog exists for cleaner interface.
+* WPML: Updated configuration for improved compatibility.
+
+= 2.32.1 – 29 June 2025 =
+* Mode Switcher: Restored mobile CSS hide functionality for improved responsive behavior.
+* Mode Switcher: Removed legacy CSS and moved .so-mode to .so-toolbar for cleaner structure.
+* Widget Dialog: Removed focus delay and improved default field handling for better user experience.
+* Fixed button secondary color scheme inheritance for consistent styling.
+* Fixed widget editable title class for proper functionality.
+* Resolved LESS linting issues for improved code quality.
+
+= 2.32.0 – 13 June 2025 =
+* Background Image: Added Alt Text setting for improved accessibility.
+* Layout Block: Added additional PanelsData check and prevented potential JavaScript null quirk.
+* Layout Builder: Fixed potential object.keys issue when removing all blocks.
+* Polylang: Prevented undefined sync warning.
+* Improved security with enhanced parameter sanitization across admin features.
+* Code Quality: Updated WordPress PHP Coding Standards compliance.
+
+= 2.31.8 – 12 May 2025 =
+* Border Styles: Improved handling of multiple border values.
+* Multi-select: Fixed type error in field handling.
+* Polylang: Improved compatibility with WPML by loading translation features only when needed.
+* Code Quality: Updated PHPCS configuration.
+
+= 2.31.7 – 01 May 2025 =
+* Fixed an issue with encoded quotes when editing widget titles.
+* Resolved Select2 CSS not outputting correctly.
+
+= 2.31.6 – 19 April 2025 =
+* Import: Closed all containers in imported layouts to ensure consistent layout rendering.
+
+= 2.31.5 – 26 February 2025 =
+* Improved Legacy Bundled Widget handling.
+* Removed `wp_targeted_link_rel` from preview generation.
+* Added `siteorigin_panels_compat_events_manager` filter to disable Events Manager compatibility.
+
+= 2.31.4 – 02 February 2025 =
+* Added Compatibility for Events Manager.
+* AIOSEO: Loaded plugin widgets.
+* Refactored SEO plugin compatibility and restored Yoast Block Editor content parsing.
+* Layout Directory: Resolved incorrect empty search after search query.
+* WPML: Adjusted editor labels for the WPML 4.7 release.
+
+= 2.31.3 – 20 December 2024 =
+* WPML: Improved compatibility by excluding `panels_data` field from automatic translation handling.
+* Prebuilt Layouts: Added text/html to accepted mime types for layout exports.
+* Added compatibility with Popup Maker to ensure correct layout rendering in popups.
+* Row Labels: Improved handling and display consistency.
+
+= 2.31.2 – 14 December 2024 =
+* Improved post type handling.
+* Select2: Improved input alignment.
+
+= 2.31.1 – 11 December 2024 =
+* Layouts Block: Prevented double toolbar when in development mode.
+* Improved row, cell, and widget attribute handling.
+
+= 2.31.0 – 22 November 2024 =
+* Styles Fields: Added `multi-select`.
+* Admin Interface: Styling improvements to the Edit Row modal.
+* Layouts Block: General styling improvements and fixes.
+
+= 2.30.0 – 26 October 2024 =
+* Image Overlay: Prevent iOS fixed background display issues.
+* Styles Settings: Converted Border Thickness to a multi-measurement field.
+* Styles Settings: Ensured color picker field and clear button are on a dedicated line.
+
+= 2.29.22 – 30 September 2024 =
+* Layout Block: Removed content filter attributes from the front-end.
+
+= 2.29.21 – 17 September 2024 =
+* Prebuilt Local Layouts: Resolved a potential error.
+* Prebuilt Local Layouts: Restricted layout files to JSON.
+
+= 2.29.20 – 08 August 2024 =
+* Rank Math: Resolved content analysis issue when multiple blocks in use.
+
+= 2.29.19 – 21 July 2024 =
+* Further improvements for attribute name handling.
+* Layout Directory: Resolved an issue with fetching page two.
+
+= 2.29.18 – 29 June 2024 =
+* Improved attribute name handling.
+* Layout Block: Improved preview updating.
+* Widget Groups: Resolved a potential `TypeError`.
+* Vantage Compatibility: Resolved a potential `TypeError`.
+
+= 2.29.17 – 15 June 2024 =
+* Layout Builder: Default the modal icon to "Cog".
+* Layouts Block: Added an additional check for clearing potential block errors.
+* Row Overlays: Resolved a potential Column/Widget video content overlap.
+* Row Cell Preview: Adjusted the percentage symbol placement.
+* Updated escaping functions to use translatable versions where needed.
+* Updated SiteOrigin Installer.
+* Number Style Field: Added min/max support.
+
+= 2.29.16 – 13 May 2024 =
+* Adjusted Add Widget modal sidebar link order and display.
+* Restored WP Events Manager compatibility.
+* Resolved fallback shortcode decoding issue.
+* Added Layout Directory caching for better performance.
+* Increased required PHP version to `7.0.0`.
+* Developer: Improved `panelsOptions` translation handling.
+
+= 2.29.15 – 27 April 2024 =
+* Layout Block: Further improvements to preview functionality and performance.
+* Admin Area: Update to ensure Classic Editor notice is translatable.
+
+= 2.29.14 – 26 April 2024 =
+* Layout Block: Restored preview functionality.
+
+= 2.29.13 – 21 April 2024 =
+* Rank Math SEO Compatibility: Resolved dependency error.
+
+= 2.29.12 – 19 April 2024 =
+* Layout Block: Improved preview.
+* Layout Block: Fix repeated rendering when switching to editor.
+* Layout Block: Restored data integration for SEO content analysis.
+* Post Content Widget: Added "Content" option.
+
 = 2.29.11 – 31 March 2024 =
 * Post Content Widget: Fixed post featured image output.
 * Post Content Widget: Remove unused content and improved title output.
@@ -663,7 +856,7 @@
 * Better compatibility with Yoast SEO.
 * Row Cell options: Prevent Yoast from resizing fields.
 * Added `panels_data` filter to `generate_css`.
-* Don’t hide the upload UI before initializing it.
+* Don't hide the upload UI before initializing it.
 * Fix collapse order in legacy layout.
 * Clear SO widgets' id and timestamp metadata when cloning a PB Page.
 * Fix layout imports in Edge.
@@ -1102,3 +1295,6 @@
 == Upgrade Notice ==
 
 Page Builder 2.0 is a major update. Please ensure that you backup your database before updating from a 1.x version. Updating from 1.x to 2.0 is a smooth transition, but it's always better to have a backup.
+
+= 2.31.6 – 19 April 2025 =
+* Import: Closed all containers in imported layouts to ensure consistent layout rendering.

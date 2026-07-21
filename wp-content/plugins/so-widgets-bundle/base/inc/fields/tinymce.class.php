@@ -137,6 +137,8 @@ class SiteOrigin_Widget_Field_TinyMCE extends SiteOrigin_Widget_Field_Text_Input
 				'redo',
 				'wp_help',
 			),
+			'mce_buttons_3' => array(),
+			'mce_buttons_4' => array(),
 			'quicktags_buttons' => array(
 				'strong',
 				'em',
@@ -356,7 +358,11 @@ class SiteOrigin_Widget_Field_TinyMCE extends SiteOrigin_Widget_Field_Text_Input
 		);
 
 		if ( $user_can_richedit ) {
-			$tiny_mce_plugins = apply_filters( 'tiny_mce_plugins', $this->mce_plugins );
+			$tiny_mce_plugins = apply_filters(
+				'tiny_mce_plugins',
+				$this->mce_plugins,
+				$this->element_id
+			);
 
 			$tmce_settings = array(
 				'toolbar1' => apply_filters( 'mce_buttons', $this->mce_buttons, $this->element_id ),
@@ -574,6 +580,10 @@ class SiteOrigin_Widget_Field_TinyMCE extends SiteOrigin_Widget_Field_Text_Input
 		}
 
 		return $instance;
+	}
+
+	public function get_related_instance_keys() {
+		return array( $this->get_selected_editor_field_name( $this->base_name ) );
 	}
 
 	public function get_selected_editor( $instance ) {

@@ -1,4 +1,9 @@
 <?php
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Gutenberg-specific scripts.
  */
@@ -22,9 +27,22 @@ function monsterinsights_gutenberg_editor_assets() {
 		}
 	}
 
-	$plugins_js_path    = '/assets/gutenberg/js/editor.min.js';
+	$suffix = (defined('SCRIPT_DEBUG') && SCRIPT_DEBUG) ? '' : '.min';
+	wp_enqueue_script( 'lodash', includes_url('js') . '/underscore.min.js' );
+	// @TODO Robo minification is breaking the editor. We will use the main version for now.
+	$plugins_js_path    = '/assets/gutenberg/js/editor.js';
 	$plugins_style_path = '/assets/gutenberg/css/editor.css';
 	$version_path       = monsterinsights_is_pro_version() ? 'pro' : 'lite';
+
+	$plugins_js_url = apply_filters(
+		'monsterinsights_editor_scripts_url',
+		plugins_url( $plugins_js_path, MONSTERINSIGHTS_PLUGIN_FILE )
+	);
+
+	$plugins_css_url = apply_filters(
+		'monsterinsights_editor_style_url',
+		plugins_url( $plugins_style_path, MONSTERINSIGHTS_PLUGIN_FILE )
+	);
 
 	$js_dependencies = array(
 		'wp-plugins',
@@ -51,7 +69,7 @@ function monsterinsights_gutenberg_editor_assets() {
 	// Enqueue our plugin JavaScript.
 	wp_enqueue_script(
 		'monsterinsights-gutenberg-editor-js',
-		plugins_url( $plugins_js_path, MONSTERINSIGHTS_PLUGIN_FILE ),
+		$plugins_js_url,
 		$js_dependencies,
 		monsterinsights_get_asset_version(),
 		true
@@ -60,7 +78,7 @@ function monsterinsights_gutenberg_editor_assets() {
 	// Enqueue our plugin JavaScript.
 	wp_enqueue_style(
 		'monsterinsights-gutenberg-editor-css',
-		plugins_url( $plugins_style_path, MONSTERINSIGHTS_PLUGIN_FILE ),
+		$plugins_css_url,
 		array(),
 		monsterinsights_get_asset_version()
 	);
@@ -87,9 +105,8 @@ function monsterinsights_gutenberg_editor_assets() {
 			'nonce'                        => wp_create_nonce( 'monsterinsights_gutenberg_headline_nonce' ),
 			'allowed_post_types'           => apply_filters( 'monsterinsights_headline_analyzer_post_types', array( 'post' ) ),
 			'current_post_type'            => $posttype,
-			'translations'                 => wp_get_jed_locale_data( monsterinsights_is_pro_version() ? 'ga-premium' : 'google-analytics-for-wordpress' ),
 			'is_headline_analyzer_enabled' => apply_filters( 'monsterinsights_headline_analyzer_enabled', true ) && 'true' !== monsterinsights_get_option( 'disable_headline_analyzer' ),
-			'reports_url'                  => add_query_arg( 'page', 'monsterinsights_reports', admin_url( 'admin.php' ) ),
+			'reports_url'                  => add_query_arg( 'page', 'monsterinsights_overview_report', admin_url( 'admin.php' ) ),
 			'vue_assets_path'              => plugins_url( $version_path . '/assets/vue/', MONSTERINSIGHTS_PLUGIN_FILE ),
 			'is_woocommerce_installed'     => class_exists( 'WooCommerce' ),
 			'license_type'                 => MonsterInsights()->license->get_license_type(),
@@ -100,9 +117,21 @@ function monsterinsights_gutenberg_editor_assets() {
 			'page_insights_addon_active'   => class_exists( 'MonsterInsights_Page_Insights' ),
 			'page_insights_nonce'          => wp_create_nonce( 'mi-admin-nonce' ),
 			'isnetwork'                    => is_network_admin(),
-			'is_v4'                        => true
+			'is_v4'                        => true,
+			'conversion_tracking_upgrade_url' => monsterinsights_get_upgrade_link( 'conversion-tracking', 'products' ),
 		) )
 	);
+
+	$textdomain = monsterinsights_get_plugin_textdomain();
+
+	wp_set_script_translations( 'monsterinsights-gutenberg-editor-js', $textdomain );
+
+	wp_add_inline_script(
+		'monsterinsights-gutenberg-editor-js',
+		monsterinsights_get_printable_translations( $textdomain ),
+		'before'
+	);
+
 }
 
 add_action( 'enqueue_block_editor_assets', 'monsterinsights_gutenberg_editor_assets' );
