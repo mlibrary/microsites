@@ -7,7 +7,7 @@
  * Author:              MonsterInsights
  * Author URI:          https://www.monsterinsights.com/lite/?utm_source=liteplugin&utm_medium=pluginheader&utm_campaign=authoruri&utm_content=7%2E0%2E0
  *
- * Version:             8.19
+ * Version:             8.18
  * Requires at least:   4.8.0
  * Requires PHP:        5.6
  *
@@ -71,7 +71,7 @@ final class MonsterInsights_Lite
 	 * @access public
 	 * @var string $version Plugin version.
 	 */
-	public $version = '8.19';
+	public $version = '8.18';
 
 	/**
 	 * Plugin file.
@@ -215,16 +215,15 @@ final class MonsterInsights_Lite
 				return self::$instance;
 			}
 
+			if (!self::$instance->check_compatibility()) {
+				return self::$instance;
+			}
+
 			// Define constants
 			self::$instance->define_globals();
 
 			// Load in settings
 			self::$instance->load_settings();
-
-			// Compatibility check
-			if (!self::$instance->check_compatibility()) {
-				return self::$instance;
-			}
 
 			// Load in Licensing
 			self::$instance->load_licensing();
@@ -256,7 +255,6 @@ final class MonsterInsights_Lite
 				self::$instance->routes             = new MonsterInsights_Rest_Routes();
 				self::$instance->notifications      = new MonsterInsights_Notifications();
 				self::$instance->notification_event = new MonsterInsights_Notification_Event();
-				self::$instance->setup_checklist    = new MonsterInsights_Setup_Checklist();
 			}
 
 			if (monsterinsights_is_pro_version()) {
@@ -537,7 +535,6 @@ final class MonsterInsights_Lite
 			require_once MONSTERINSIGHTS_PLUGIN_DIR . 'includes/admin/notice.php';
 			require_once MONSTERINSIGHTS_PLUGIN_DIR . 'includes/admin/licensing/autoupdate.php';
 			require_once MONSTERINSIGHTS_PLUGIN_DIR . 'includes/admin/review.php';
-			require_once MONSTERINSIGHTS_PLUGIN_DIR . 'includes/admin/setup-checklist.php';
 
 			// Pages
 			require_once MONSTERINSIGHTS_PLUGIN_DIR . 'includes/admin/pages/settings.php';
