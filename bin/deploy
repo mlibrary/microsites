@@ -19,6 +19,13 @@ if [ x"$1" = x"-C" ] ; then
   DRY=""
 fi
 
+# DB export
+# ssh "$PROD_HOST" -- '~/bin/wp' --path="$PROD_PATH" --url="$PROD_URL" db export - --lock-tables=false --skip-extended-insert | gzip -c > "$(date +%Y%m%d_%H%M%S)_db.sql.gz"
+
+if [ x"$DRY" != x"-n" ] ; then
+  ssh "$PROD_HOST" -- '~/bin/wp' --path="$PROD_PATH" --url="$PROD_URL" maintenance-mode activate
+fi
+
 rsync \
   -cglOprtvzi \
   --delete \
@@ -46,3 +53,8 @@ rsync \
   --exclude=\*.key \
   "$DIR/" \
   "$PROD_HOST":"$PROD_PATH"
+
+if [ x"$DRY" != x"-n" ] ; then
+  ssh "$PROD_HOST" -- '~/bin/wp' --path="$PROD_PATH" --url="$PROD_URL" core update-db --network
+  ssh "$PROD_HOST" -- '~/bin/wp' --path="$PROD_PATH" --url="$PROD_URL" maintenance-mode deactivate
+fi
