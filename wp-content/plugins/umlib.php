@@ -86,7 +86,8 @@ function umlib_custom_route_sites() {
 add_action('rest_api_init', function() {
   register_rest_route('wp/v2', 'sites', [
     'methods' => 'GET',
-    'callback' => 'umlib_custom_route_sites'
+    'callback' => 'umlib_custom_route_sites',
+    'permission_callback' => '__return_true',
   ]);
 });
 
