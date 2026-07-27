@@ -4,6 +4,9 @@
  * @var array  $panels
  * @var string $icon_open
  * @var string $icon_close
+ * @var string $title_tag
+ * @var int    $title_level
+ * @var bool   $title_has_native_heading
  */
 if ( ! empty( $instance['title'] ) ) {
 	echo $args['before_title'] . wp_kses_post( $instance['title'] ) . $args['after_title'];
@@ -12,17 +15,30 @@ if ( ! empty( $instance['title'] ) ) {
 <div>
 	<div class="sow-accordion">
 	<?php foreach ( $panels as $panel ) { ?>
-		<div class="sow-accordion-panel<?php if ( $panel['initial_state'] == 'open' ) {
+		<div class="sow-accordion-panel
+		<?php
+		if ( $panel['initial_state'] == 'open' ) {
 			echo ' sow-accordion-panel-open';
-		} ?>"
-			 data-anchor-id="<?php echo sanitize_title_with_dashes( $panel['anchor'] ); ?>">
-				<div class="sow-accordion-panel-header-container" role="heading" aria-level="2">
+		}
+			?>
+			"
+				data-anchor-id="<?php echo esc_attr( sanitize_title( $panel['anchor'] ) ); ?>">
+					<div class="sow-accordion-panel-header-container"<?php if ( ! $title_has_native_heading ) { ?> role="heading" aria-level="<?php echo esc_attr( $title_level ); ?>"<?php } ?>>
 					<div class="sow-accordion-panel-header" tabindex="0" role="button" id="accordion-label-<?php echo sanitize_title_with_dashes( $panel['anchor'] ); ?>" aria-controls="accordion-content-<?php echo sanitize_title_with_dashes( $panel['anchor'] ); ?>" aria-expanded="<?php echo $panel['initial_state'] == 'open' ? 'true' : 'false'; ?>">
-						<div class="sow-accordion-title <?php echo empty( $panel['after_title'] ) ? 'sow-accordion-title-icon-left' : 'sow-accordion-title-icon-right'; ?>">
+						<<?php echo esc_attr( $title_tag ); ?> class="sow-accordion-title <?php echo empty( $panel['after_title'] ) ? 'sow-accordion-title-icon-left' : 'sow-accordion-title-icon-right'; ?>">
+							<?php
+							// before_title/after_title carry plugin-generated icon markup
+							// (filter-owned slots, unconditionally reset in
+							// get_template_variables() before the filter runs — never
+							// instance data). Deliberately NOT passed through
+							// wp_kses_post(): kses's attribute-value handling strips the
+							// Private Use Area glyph entities in data-sow-icon="&#x...;",
+							// blanking every font icon.
+							?>
 							<?php echo $panel['before_title']; ?>
 							<?php echo wp_kses_post( $panel['title'] ); ?>
 							<?php echo $panel['after_title']; ?>
-						</div>
+						</<?php echo esc_attr( $title_tag ); ?>>
 						<div class="sow-accordion-open-close-button">
 							<div class="sow-accordion-open-button">
 								<?php echo siteorigin_widget_get_icon( $icon_open ); ?>

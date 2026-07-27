@@ -30,7 +30,7 @@ function admin_roles_page_load()
     wp_enqueue_script('pp-capabilities-chosen-js', plugin_dir_url(CME_FILE) . 'common/libs/chosen-v1.8.7/chosen.jquery.js', ['jquery'], PUBLISHPRESS_CAPS_VERSION);
 
     //Localize
-    wp_localize_script($plugin_name . '_table_edit', 'pp_roles_i18n', ['confirm_delete' => __('Are you sure you want to delete this role?', 'capsman-enhanced')]);
+    wp_localize_script($plugin_name . '_table_edit', 'pp_roles_i18n', ['confirm_delete' => __('Are you sure you want to delete this role?', 'capability-manager-enhanced')]);
     wp_enqueue_style('pp-capabilities-chosen-css', plugin_dir_url(CME_FILE) . 'common/libs/chosen-v1.8.7/chosen.css', false, PUBLISHPRESS_CAPS_VERSION);
 
     //initialize table here to be able to register default WP_List_Table screen options
@@ -84,13 +84,14 @@ function pp_roles_user_has_role($user_id, $roles)
  * Check if role exist and return it data
  *
  * @param string $role_name
+ * @param string $view
  * @return bool|WP_Role
  */
-function pp_roles_get_role_data($role_name)
+function pp_roles_get_role_data($role_name, $view = 'all')
 {
 
     $role = false;
-    $all_roles      = pp_capabilities_roles()->manager->get_roles_for_list_table('all', true);
+    $all_roles      = pp_capabilities_roles()->manager->get_roles_for_list_table($view, true, true);
 
     foreach ($all_roles as $role_data) {
         if ($role_name === $role_data['role']) {
@@ -199,11 +200,11 @@ function pp_capabilities_roles_profile_features($role, $check = false)
 function pp_capabilities_roles_admin_menus($role, $check = false)
 {
     if ($role && $check) {
-        $nav_menu_item_option = !empty(get_option('capsman_nav_item_menus')) ? get_option('capsman_nav_item_menus') : [];
-        $nav_menu_item_option = array_key_exists($role, $nav_menu_item_option) ? (array)$nav_menu_item_option[$role] : [];
-    
-        $disabled_items = array_filter($nav_menu_item_option);
-    
+        $admin_menu_option = !empty(get_option('capsman_admin_menus')) ? get_option('capsman_admin_menus') : [];
+        $admin_menu_option = array_key_exists($role, $admin_menu_option) ? (array)$admin_menu_option[$role] : [];
+
+        $disabled_items = array_filter($admin_menu_option);
+
         return count($disabled_items);
     } else {
         return 0;

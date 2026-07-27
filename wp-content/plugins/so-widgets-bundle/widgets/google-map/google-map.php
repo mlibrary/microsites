@@ -1,11 +1,11 @@
 <?php
-
 /*
 Widget Name: Google Maps
 Description: Embed a customizable Google Map with markers, directions, styling options, and interactive elements.
 Author: SiteOrigin
 Author URI: https://siteorigin.com
 Documentation: https://siteorigin.com/widgets-bundle/google-maps-widget/
+Keywords: directions, embed, interactive, map, markers, navigation, navigate
 */
 
 class SiteOrigin_Widget_GoogleMap_Widget extends SiteOrigin_Widget {
@@ -23,6 +23,7 @@ class SiteOrigin_Widget_GoogleMap_Widget extends SiteOrigin_Widget {
 		);
 
 		add_filter( 'siteorigin_widgets_field_class_paths', array( $this, 'add_location_field_path' ) );
+		add_action( 'siteorigin_widgets_enqueue_frontend_scripts_sow-google-map', array( $this, 'enqueue_widget_scripts' ) );
 	}
 
 	// Tell the autoloader where to look for the location field class.
@@ -30,10 +31,6 @@ class SiteOrigin_Widget_GoogleMap_Widget extends SiteOrigin_Widget {
 		$class_paths[] = plugin_dir_path( __FILE__ ) . 'fields/';
 
 		return $class_paths;
-	}
-
-	public function initialize() {
-		add_action( 'siteorigin_widgets_enqueue_frontend_scripts_sow-google-map', array( $this, 'enqueue_widget_scripts' ) );
 	}
 
 	public function get_widget_form() {
@@ -102,6 +99,16 @@ class SiteOrigin_Widget_GoogleMap_Widget extends SiteOrigin_Widget {
 						'state_handler' => array(
 							'map_type[static]' => array( 'show' ),
 							'_else[map_type]' => array( 'hide' ),
+						),
+					),
+
+					'map_id' => array(
+						'type' => 'text',
+						'label' => __( 'Map ID', 'so-widgets-bundle' ),
+						'description' => sprintf(
+							__( 'A Map ID allows you to manage your map styles using the %sGoogle Cloud Console%s. This is only used if Map Styles are not set.', 'so-widgets-bundle' ),
+							'<a href="https://console.cloud.google.com/google/maps-apis/studio/maps" target="_blank" rel="noopener noreferrer">',
+							'</a>'
 						),
 					),
 
@@ -262,7 +269,7 @@ class SiteOrigin_Widget_GoogleMap_Widget extends SiteOrigin_Widget {
 						'type' => 'checkbox',
 						'label' => __( 'Allow multiple simultaneous Info Windows?', 'so-widgets-bundle' ),
 						'default' => true,
-						'description' => __( 'This setting is ignored when Info Windows are set to always display.' ),
+						'description' => __( 'This setting is ignored when Info Windows are set to always display.', 'so-widgets-bundle' ),
 					),
 				),
 			),
@@ -296,6 +303,7 @@ class SiteOrigin_Widget_GoogleMap_Widget extends SiteOrigin_Widget {
 					),
 					'raw_json_map_styles' => array(
 						'type'        => 'textarea',
+						'json'        => true,
 						'state_handler' => array(
 							'style_method[raw_json]' => array( 'show' ),
 							'_else[style_method]' => array( 'hide' ),
@@ -526,11 +534,13 @@ class SiteOrigin_Widget_GoogleMap_Widget extends SiteOrigin_Widget {
 	}
 
 	public function get_template_name( $instance ) {
-		return $instance['settings']['map_type'] == 'static' ? 'static-map' : 'js-map';
+		return $this->get_map_type( $instance ) === 'static' ?
+			'static-map' :
+			'js-map';
 	}
 
 	public function get_style_name( $instance ) {
-		if ( $instance['settings']['map_type'] == 'static' ) {
+		if ( $this->get_map_type( $instance ) === 'static' ) {
 			return false;
 		}
 
@@ -579,7 +589,15 @@ class SiteOrigin_Widget_GoogleMap_Widget extends SiteOrigin_Widget {
 				if ( empty( $instance['directions']['waypoints'] ) ) {
 					unset( $instance['directions']['waypoints'] );
 				}
+
 				$directions = siteorigin_widgets_underscores_to_camel_case( $instance['directions'] );
+
+				// Google Maps has strict type checks so we need to
+				// ensure boolean values are set correctly.
+				$directions['optimizeWaypoints'] = ! empty( $directions['optimizeWaypoints'] );
+				$directions['avoidHighways'] = ! empty( $directions['avoidHighways'] );
+				$directions['avoidTolls'] = ! empty( $directions['avoidTolls'] );
+				$directions['preserveViewport'] = ! empty( $directions['preserveViewport'] );
 			}
 
 			$markerpos = isset( $markers['marker_positions'] ) ? $markers['marker_positions'] : '';
@@ -608,18 +626,23 @@ class SiteOrigin_Widget_GoogleMap_Widget extends SiteOrigin_Widget {
 				'mobileZoom'        => $settings['mobile_zoom'],
 				'gestureHandling'   => isset( $settings['gesture_handling'] ) ? $settings['gesture_handling'] : 'greedy',
 				'disable_ui'        => $settings['disable_default_ui'],
-				'marker_icon'       => ! empty( $mrkr_src ) ? $mrkr_src[0] : '',
-				'markers_draggable' => isset( $markers['markers_draggable'] ) ? $markers['markers_draggable'] : '',
+				'marker_icon'       => ! empty( $mrkr_src ) ? $mrkr_src[0] : false,
+				'markers_draggable' => ! empty( $markers['markers_draggable'] ),
 				'marker_at_center'  => ! empty( $markers['marker_at_center'] ),
 				'marker_info_display' => $markers['info_display'],
 				'marker_info_multiple' => $markers['info_multiple'],
-				'marker_positions'  => ! empty( $markerpos ) ? $markerpos : '',
-				'map_name'          => ! empty( $styles['styles'] ) ? $styles['map_name'] : '',
-				'map_styles'        => ! empty( $styles['styles'] ) ? $styles['styles'] : '',
+				'marker_positions'  => ! empty( $markerpos ) ? $markerpos : false,
+				'map_name'          => ! empty( $styles['styles'] ) ? $styles['map_name'] : false,
+				'map_styles'        => ! empty( $styles['styles'] ) ? $styles['styles'] : false,
 				'directions'        => $directions,
 				'api_key'           => self::get_api_key( $instance ),
 				'breakpoint'        => $breakpoint,
 			) );
+
+			// Only set Map ID if there aren't any styles.
+			if ( empty( $styles['styles'] ) ) {
+				$map_data['id'] = ! empty( $settings['map_id'] ) ? $settings['map_id'] : substr( uniqid(), 0, 6 );
+			}
 
 			return array(
 				'map_id'   => md5( json_encode( $instance ) ),
@@ -668,27 +691,34 @@ class SiteOrigin_Widget_GoogleMap_Widget extends SiteOrigin_Widget {
 		return $location;
 	}
 
+	/**
+	 * Get the map type for the current instance.
+	 *
+	 * @param array $instance The widget instance.
+	 * @return string The map type.
+	 */
+	public function get_map_type( $instance ) {
+		return ! empty( $instance['settings']['map_type'] ) ?
+			(string) $instance['settings']['map_type'] :
+			'interactive';
+	}
+
 	public function enqueue_widget_scripts( $instance ) {
-		if ( ! empty( $instance['settings']['map_type'] ) && $instance['settings']['map_type'] == 'interactive' ||
-			 $this->is_preview( $instance ) ) {
+		$is_preview = $this->is_preview( $instance );
+		$map_type = $this->get_map_type( $instance );
+
+		if (
+			$is_preview ||
+			$map_type === 'interactive'
+		) {
 			wp_enqueue_script( 'sow-google-map' );
-
-			$global_settings = $this->get_global_settings();
-
-			wp_localize_script(
-				'sow-google-map',
-				'soWidgetsGoogleMap',
-				array(
-					'map_consent'  => ! empty( $global_settings['map_consent'] ),
-					'geocode' => array(
-						'noResults' => __( 'There were no results for the place you entered. Please try another.', 'so-widgets-bundle' ),
-					),
-				)
-			);
 		}
 
-		if ( ! empty( $instance['settings']['map_type'] ) && $instance['settings']['map_type'] == 'static' ||
-			 $this->is_preview( $instance ) ) {
+
+		if (
+			$is_preview ||
+			$map_type === 'static'
+		) {
 			wp_enqueue_script(
 				'sow-google-map-static',
 				plugin_dir_url( __FILE__ ) . 'js/static-map' . SOW_BUNDLE_JS_SUFFIX . '.js',
@@ -804,6 +834,10 @@ class SiteOrigin_Widget_GoogleMap_Widget extends SiteOrigin_Widget {
 				$st_string = '&style=' . $st_string;
 				$src_url .= $st_string;
 			}
+		} elseif ( ! empty( $instance['settings']['map_id'] ) ) {
+			// As styles aren't set, check if a map id is.
+			// This will allow for Cloud Styles to work.
+			$src_url .= '&map_id=' . $instance['settings']['map_id'];
 		}
 
 		if ( ! empty( $instance['markers'] ) ) {

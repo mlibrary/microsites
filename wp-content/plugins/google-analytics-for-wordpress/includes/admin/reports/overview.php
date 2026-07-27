@@ -36,6 +36,21 @@ final class MonsterInsights_Report_Overview extends MonsterInsights_Report {
 	}
 
 	/**
+	 * Get cache key suffix based on included metrics.
+	 *
+	 * Different metric combinations should have separate cache entries
+	 * to prevent cache overwrites between users with different preferences.
+	 *
+	 * @param array $extra_params Extra parameters passed to get_data().
+	 * @return string Cache key suffix with metrics hash.
+	 * @since 9.11.0
+	 */
+	protected function get_cache_key_suffix( $extra_params ) {
+		$included_metrics = ! empty( $extra_params['included_metrics'] ) ? $extra_params['included_metrics'] : 'sessions,pageviews';
+		return '_' . md5( $included_metrics );
+	}
+
+	/**
 	 * Prepare report-specific data for output.
 	 *
 	 * @param array $data The data from the report before it gets sent to the frontend.
@@ -75,6 +90,72 @@ final class MonsterInsights_Report_Overview extends MonsterInsights_Report {
 			);
 		}
 
+		$this->define_chart_overlay( $data );
+
 		return apply_filters( 'monsterinsights_report_overview_data', $data );
+	}
+
+	/**
+	 * Determine we need show chart overlay or not.
+	 *
+	 * @param array $data
+	 *
+	 * @return void
+	 */
+	private function define_chart_overlay( &$data ) {
+		// Set default value.
+		$data['data']['show_chart_overlay'] = false;
+
+		$connection_time = $this->get_connection_time();
+
+		if ( ! $connection_time ) {
+			return;
+		}
+
+		// If 24 hour passed then remove overlay.
+		if ( $connection_time + DAY_IN_SECONDS < time() ) {
+			return;
+		}
+
+		// If till now no data has tracked.
+		if ( ! $data['data']['overviewgraph']['sessions']['max'] ) {
+			$data['data']['show_chart_overlay'] = true;
+
+			// Generate random chart data.
+			for ( $i = 0; $i < $data['data']['overviewgraph']['count']; $i++ ) {
+				$data['data']['overviewgraph']['sessions']['datapoints'][ $i ] = wp_rand(1, 5);
+				$data['data']['overviewgraph']['pageviews']['datapoints'][ $i ] = wp_rand(1, 5);
+			}
+
+		}
+	}
+
+	/**
+	 * Find when GA connected.
+	 *
+	 * @return int
+	 */
+	private function get_connection_time() {
+		$activated = get_option( 'monsterinsights_over_time', array() );
+
+		// If user had both activate.
+		if ( ! empty( $activated['connected_date_lite'] ) && ! empty( $activated['connected_date_pro'] ) ) {
+			// If lite activated last.
+			if ( $activated['connected_date_lite'] > $activated['connected_date_pro'] ) {
+				return $activated['connected_date_lite'];
+			}
+
+			return $activated['connected_date_pro'];
+		}
+
+		// If user has only lite activated.
+		if ( ! empty( $activated['connected_date_lite'] ) ) {
+			return $activated['connected_date_lite'];
+		}
+
+		// If user has only pro activated.
+		if ( ! empty( $activated['connected_date_pro'] ) ) {
+			return $activated['connected_date_pro'];
+		}
 	}
 }

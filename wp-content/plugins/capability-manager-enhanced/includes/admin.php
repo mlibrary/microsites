@@ -37,40 +37,77 @@ if ($sidebar_metabox_state == '' || !is_array($sidebar_metabox_state)) {
     $sidebar_metabox_state['how_to_user_capabilities'] = 'opened';
 }
 
+if (!isset($sidebar_metabox_state['multi_site'])) {
+    $sidebar_metabox_state['multi_site'] = 'opened';
+}
 $roles = $this->roles;
 $default = $this->current;
+$application_password_subjects = function_exists('pp_capabilities_get_application_password_subjects')
+	? pp_capabilities_get_application_password_subjects()
+	: [];
+$is_application_password = function_exists('pp_capabilities_is_application_password_subject')
+	&& pp_capabilities_is_application_password_subject($default)
+	&& isset($application_password_subjects[$default]);
+$application_password_denied_caps = $is_application_password && function_exists('pp_capabilities_get_application_password_denied_capabilities')
+	? pp_capabilities_get_application_password_denied_capabilities($default)
+	: [];
+$rcaps = [];
+$set_application_password_cap = function ($cap_name) use ($is_application_password, $application_password_denied_caps, &$rcaps) {
+	if (!$is_application_password || !is_scalar($cap_name)) {
+		return;
+	}
 
-if ( $block_read_removal = _cme_is_read_removal_blocked( $this->current ) ) {
+	$cap_name = sanitize_text_field((string) $cap_name);
+
+	if ('' === $cap_name) {
+		return;
+	}
+
+	$rcaps[$cap_name] = empty($application_password_denied_caps[$cap_name]);
+};
+
+if ( !$is_application_password && ( $block_read_removal = _cme_is_read_removal_blocked( $this->current ) ) ) {
 	if ( $current = get_role($default) ) {
 		if ( empty( $current->capabilities['read'] ) ) {
-			ak_admin_error( sprintf( __( 'Warning: This role cannot access the dashboard without the read capability. %1$sClick here to fix this now%2$s.', 'capsman-enhanced' ), '<a href="javascript:void(0)" class="cme-fix-read-cap">', '</a>' ) );
+			ak_admin_error( sprintf( __( 'Warning: This role cannot access the dashboard without the read capability. %1$sClick here to fix this now%2$s.', 'capability-manager-enhanced' ), '<a href="javascript:void(0)" class="cme-fix-read-cap">', '</a>' ) );
 		}
 	}
 }
+
+// include extractor plugin capabilites
+require_once (dirname(CME_FILE) . '/includes/extractor-capabilities.php');
 
 require_once (dirname(CME_FILE) . '/includes/roles/roles-functions.php');
 
 require_once( dirname(__FILE__).'/pp-ui.php' );
 $pp_ui = new Capsman_PP_UI();
 
-if( defined('PRESSPERMIT_ACTIVE') ) {
+if( defined('PRESSPERMIT_ACTIVE') && !$is_application_password ) {
 	$pp_metagroup_caps = $pp_ui->get_metagroup_caps( $default );
 } else {
 	$pp_metagroup_caps = array();
 }
 
 if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option')) {
-    $pp_revisions_copy   = rvy_get_option("copy_posts_capability");
-    $pp_revisions_revise = rvy_get_option("revise_posts_capability");
+	$pp_revisions_copy   = rvy_get_option("copy_posts_capability");
+	$pp_revisions_revise = rvy_get_option("revise_posts_capability");
+
+	if (version_compare(PUBLISHPRESS_REVISIONS_VERSION, '3.7.15-beta3', '>=')) {
+		$pp_revisions_approve = true;
+	} else {
+		$pp_revisions_approve = false;
+	}
 } else {
-    $pp_revisions_copy   = false;
-    $pp_revisions_revise = false;
+	$pp_revisions_copy   = false;
+	$pp_revisions_revise = false;
+	$pp_revisions_approve = false;
 }
+
 ?>
 <div class="wrap publishpress-caps-manage pressshack-admin-wrapper">
 	<div id="icon-capsman-admin" class="icon32"></div>
 
-	<h1><?php esc_html_e('Role Capabilities', 'capsman-enhanced') ?></h1>
+	<h1><?php esc_html_e('Role Capabilities', 'capability-manager-enhanced') ?></h1>
 
 	<?php
 	pp_capabilities_roles()->notify->display();
@@ -107,13 +144,36 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 		<div class="pp-column-left">
             <div style="margin-bottom: 20px;">
                 <div class="pp-capabilities-submit-top" style="float:right">
-                    <?php
-                    $caption = (in_array(sanitize_key(get_locale()), ['en_EN', 'en_US'])) ? 'Save Capabilities' : __('Save Changes', 'capsman-enhanced');
-                    ?>
-                    <input type="submit" name="SaveRole" value="<?php echo esc_attr($caption);?>" class="button-primary" />
+					<div class="capabilities-top-action">
+						<div class="pp-capabilities-global-search">
+							<input type="text" id="pp-global-capability-search"
+								class="regular-text"
+								placeholder="<?php esc_attr_e('Search capabilities...', 'capability-manager-enhanced'); ?>" />
+							<div id="pp-search-results-summary" style="font-size: 12px; color: #666;"></div>
+						</div>
+						<div>
+							<?php
+							$caption = (in_array(sanitize_key(get_locale()), ['en_EN', 'en_US'])) ? 'Save Capabilities' : __('Save Changes');
+							?>
+							<input type="submit" name="SaveRole" value="<?php echo esc_attr($caption);?>" class="button-primary" />
+						</div>
+					</div>
                 </div>
+                <div class="clear"></div>
 
                 <select name="role">
+                    <?php if (!empty($application_password_subjects)) : ?>
+                        <optgroup label="<?php esc_attr_e('Application Passwords', 'capability-manager-enhanced'); ?>">
+                            <?php foreach ($application_password_subjects as $subject => $application_password) : ?>
+                                <option value="<?php echo esc_attr($subject); ?>" <?php selected($default, $subject); ?>>
+                                    <?php echo esc_html($application_password['label']); ?> &nbsp;
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                    <?php endif; ?>
+                    <?php if (function_exists('pp_capabilities_application_password_capabilities_enabled') && pp_capabilities_application_password_capabilities_enabled()) : ?>
+                        <optgroup label="<?php esc_attr_e('Roles', 'capability-manager-enhanced'); ?>">
+                    <?php endif; ?>
                     <?php
                     foreach ( $roles as $role_name => $name ) {
                         $role_name = sanitize_key($role_name);
@@ -124,6 +184,9 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
                         }
                     }
                     ?>
+                    <?php if (function_exists('pp_capabilities_application_password_capabilities_enabled') && pp_capabilities_application_password_capabilities_enabled()) : ?>
+                        </optgroup>
+                    <?php endif; ?>
                 </select>
             </div>
 			<?php
@@ -131,11 +194,11 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 			?>
 
 			<?php
-			if ( defined( 'PRESSPERMIT_ACTIVE' ) ) {
+			if ( defined( 'PRESSPERMIT_ACTIVE' ) && !$is_application_password ) {
 				$pp_ui->show_capability_hints( $default );
 			}
 
-			if ( MULTISITE ) {
+			if ( defined( 'MULTISITE' ) && MULTISITE ) {
 				global $wp_roles;
 				global $wpdb;
 
@@ -143,15 +206,25 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 					$main_site_id = (function_exists('get_main_site_id')) ? get_main_site_id() : 1;
 					switch_to_blog($main_site_id);
 					wp_cache_delete( $wpdb->prefix . 'user_roles', 'options' );
+					restore_current_blog();
 				}
 
 				( method_exists( $wp_roles, 'for_site' ) ) ? $wp_roles->for_site() : $wp_roles->reinit();
 			}
 			$capsman->reinstate_db_roles();
 
-			$current = get_role($default);
-
-			$rcaps = $current->capabilities;
+			if ($is_application_password) {
+				$rcaps = function_exists('pp_capabilities_get_application_password_ui_capabilities')
+					? pp_capabilities_get_application_password_ui_capabilities($default, array_keys($this->capabilities))
+					: [];
+				$current = (object) [
+					'name'         => isset($application_password_subjects[$default]['label']) ? $application_password_subjects[$default]['label'] : $default,
+					'capabilities' => $rcaps,
+				];
+			} else {
+				$current = get_role($default);
+				$rcaps = $current->capabilities;
+			}
 
 			$is_administrator = current_user_can( 'administrator' ) || (is_multisite() && is_super_admin());
 
@@ -159,11 +232,35 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 			$custom_tax = get_taxonomies( array( '_builtin' => false ), 'names' );
 
 			$defined = [];
-			$defined['type'] = apply_filters('cme_filterable_post_types', get_post_types(['public' => true, 'show_ui' => true], 'object', 'or'));
+
+			// Get public post types
+			$post_types = get_post_types(['public' => true, 'show_ui' => true], 'object', 'or');
+
+			// Include private post types if setting is enabled
+			if (get_option('cme_capabilities_show_private_post_types', 0)) {
+				$private_types = get_post_types(['public' => false, 'show_ui' => true], 'object', 'or');
+				$post_types = array_merge($post_types, $private_types);
+			}
+
+			$defined['type'] = apply_filters('cme_filterable_post_types', $post_types);
+
+			if (in_array(get_locale(), ['en_EN', 'en_US'])) {
+				$defined['type']['wp_navigation']->label = __('Nav Menus (Block)', 'capability-manager-enhanced');
+			} else {
+				$defined['type']['wp_navigation']->label .= ' (' . __('Block', 'capability-manager-enhanced') . ')';
+			}
+
 			$defined['taxonomy'] = apply_filters('cme_filterable_taxonomies', get_taxonomies(['public' => true, 'show_ui' => true], 'object', 'or'));
+			$defined['taxonomy']['nav_menu'] = get_taxonomy('nav_menu');
+
+			if (in_array(get_locale(), ['en_EN', 'en_US'])) {
+				$defined['taxonomy']['nav_menu']->label = __('Nav Menus (Legacy)', 'capability-manager-enhanced');
+			} else {
+				$defined['taxonomy']['nav_menu']->label .= ' (' . __('Legacy', 'capability-manager-enhanced') . ')';
+			}
 
 			// bbPress' dynamic role def requires additional code to enforce stored caps
-			$unfiltered['type'] = apply_filters('presspermit_unfiltered_post_types', ['forum','topic','reply','wp_block']);
+			$unfiltered['type'] = apply_filters('presspermit_unfiltered_post_types', ['forum','topic','reply', 'customize_changeset']);
 			$unfiltered['type'] = (defined('PP_CAPABILITIES_NO_LEGACY_FILTERS')) ? $unfiltered['type'] : apply_filters('pp_unfiltered_post_types', $unfiltered['type']);
 
 			$unfiltered['taxonomy'] = apply_filters('presspermit_unfiltered_post_types', ['post_status', 'topic-tag']);  // avoid confusion with Edit Flow administrative taxonomy
@@ -188,17 +285,21 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 			$cap_properties['delete']['type'] = array( 'delete_posts', 'delete_others_posts' );
 			$cap_properties['delete']['type'] = array_merge( $cap_properties['delete']['type'], array( 'delete_published_posts', 'delete_private_posts' ) );
 
-            if (defined('PRESSPERMIT_ACTIVE')) {
+            if (defined('PRESSPERMIT_VERSION') && defined('PRESSPERMIT_COLLAB_VERSION')) {
                 $cap_properties['list']['type'] = ['list_posts', 'list_others_posts', 'list_published_posts', 'list_private_posts'];
             }
 
-            if ($pp_revisions_copy) {
-                $cap_properties['copy']['type'] = ['copy_posts', 'copy_others_posts', 'copy_published_posts', 'copy_private_posts'];
-            }
+			if ($pp_revisions_copy) {
+				$cap_properties['copy']['type'] = ['copy_posts', 'copy_others_posts', 'copy_published_posts', 'copy_private_posts'];
+			}
 
-            if ($pp_revisions_revise) {
-                $cap_properties['revise']['type'] = ['revise_posts', 'revise_others_posts', 'revise_published_posts', 'revise_private_posts'];
-            }
+			if ($pp_revisions_revise) {
+				$cap_properties['revise']['type'] = ['revise_posts', 'revise_others_posts', 'revise_published_posts', 'revise_private_posts'];
+			}
+
+			if ($pp_revisions_approve) {
+				$cap_properties['approve']['type'] = ['approve_posts', 'approve_others_posts'];
+			}
 
 			$cap_properties['read']['type'] = array( 'read_private_posts' );
 
@@ -207,36 +308,40 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 			$stati = get_post_stati( array( 'internal' => false ) );
 
 			$cap_type_names = array(
-				'' => __( '&nbsp;', 'capsman-enhanced' ),
-				'read' => __( 'Reading', 'capsman-enhanced' ),
-				'edit' => __( 'Editing', 'capsman-enhanced' ),
-				'delete' => __( 'Deletion', 'capsman-enhanced' ),
-                'taxonomies' => __( 'Taxonomies', 'capsman-enhanced' ),
+				'' => __( '&nbsp;', 'capability-manager-enhanced' ),
+				'read' => __( 'Visibility', 'capability-manager-enhanced' ),
+				'edit' => __( 'Editing', 'capability-manager-enhanced' ),
+				'delete' => __( 'Deletion', 'capability-manager-enhanced' ),
+                'taxonomies' => __( 'Taxonomies', 'capability-manager-enhanced' ),
 			);
 
-            if (defined('PRESSPERMIT_ACTIVE')) {
-                $cap_type_names['list'] = __('Listing', 'capsman-enhanced');
+            if (defined('PRESSPERMIT_VERSION') && defined('PRESSPERMIT_COLLAB_VERSION')) {
+                $cap_type_names['list'] = __('Listing', 'capability-manager-enhanced');
             }
 
             if ($pp_revisions_copy) {
-                $cap_type_names['copy'] = __('Copy', 'capsman-enhanced');
+                $cap_type_names['copy'] = __('Create Revision', 'capability-manager-enhanced');
             }
 
             if ($pp_revisions_revise) {
-                $cap_type_names['revise'] = __('Revise', 'capsman-enhanced');
+                $cap_type_names['revise'] = __('Submit Revision', 'capability-manager-enhanced');
             }
 
+			if ($pp_revisions_approve) {
+				$cap_type_names['approve'] = __('Approve Revision', 'capability-manager-enhanced');
+			}
+
 			$cap_tips = array(
-				'read_private' => esc_attr__( 'can read posts which are currently published with private visibility', 'capsman-enhanced' ),
-				'edit' => esc_attr__( 'has basic editing capability (but may need other capabilities based on post status and ownership)', 'capsman-enhanced' ),
-				'edit_others' => esc_attr__( 'can edit posts which were created by other users', 'capsman-enhanced' ),
-				'edit_published' => esc_attr__( 'can edit posts which are currently published', 'capsman-enhanced' ),
-				'edit_private' => esc_attr__( 'can edit posts which are currently published with private visibility', 'capsman-enhanced' ),
-				'publish' => esc_attr__( 'can make a post publicly visible', 'capsman-enhanced' ),
-				'delete' => esc_attr__( 'has basic deletion capability (but may need other capabilities based on post status and ownership)', 'capsman-enhanced' ),
-				'delete_others' => esc_attr__( 'can delete posts which were created by other users', 'capsman-enhanced' ),
-				'delete_published' => esc_attr__( 'can delete posts which are currently published', 'capsman-enhanced' ),
-				'delete_private' => esc_attr__( 'can delete posts which are currently published with private visibility', 'capsman-enhanced' ),
+				'read_private' => esc_attr__( 'Can read posts which are currently published with private visibility.', 'capability-manager-enhanced' ),
+				'edit' => esc_attr__( 'Has basic editing capability (but may need other capabilities based on post status and ownership).', 'capability-manager-enhanced' ),
+				'edit_others' => esc_attr__( 'Can edit posts which were created by other users.', 'capability-manager-enhanced' ),
+				'edit_published' => esc_attr__( 'Can edit posts which are currently published.', 'capability-manager-enhanced' ),
+				'edit_private' => esc_attr__( 'Can edit posts which are currently published with private visibility.', 'capability-manager-enhanced' ),
+				'publish' => esc_attr__( 'Can make a post publicly visible.', 'capability-manager-enhanced' ),
+				'delete' => esc_attr__( 'Has basic deletion capability (but may need other capabilities based on post status and ownership).', 'capability-manager-enhanced' ),
+				'delete_others' => esc_attr__( 'Can delete posts which were created by other users.', 'capability-manager-enhanced' ),
+				'delete_published' => esc_attr__( 'Can delete posts which are currently published.', 'capability-manager-enhanced' ),
+				'delete_private' => esc_attr__( 'Can delete posts which are currently published with private visibility.', 'capability-manager-enhanced' ),
 			);
 
 			$default_caps = array( 'read_private_posts', 'edit_posts', 'edit_others_posts', 'edit_published_posts', 'edit_private_posts', 'publish_posts', 'delete_posts', 'delete_others_posts', 'delete_published_posts', 'delete_private_posts',
@@ -244,7 +349,7 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 								   'manage_categories'
 								   );
 
-            if (defined('PRESSPERMIT_ACTIVE')) {
+            if (defined('PRESSPERMIT_PRO_FILE') && defined('PRESSPERMIT_COLLAB_VERSION')) {
                 $default_caps = array_merge($default_caps, ['list_posts', 'list_others_posts', 'list_published_posts', 'list_private_posts', 'list_pages', 'list_others_pages', 'list_published_pages', 'list_private_pages']);
             }
 
@@ -268,30 +373,106 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 			<script type="text/javascript">
 			/* <![CDATA[ */
 			jQuery(document).ready( function($) {
-				// Tabs and Content display
-				$('.ppc-capabilities-tabs > ul > li').click( function() {
-					var $pp_tab = $(this).attr('data-content');
+				if ($('.ppc-capabilities-tabs li.ppc-capabilities-tab-active').hasClass('ppc-full-width')) {
+					$('.capabilities-sidebar').hide();
+					$('#ppc-capabilities-wrapper .ppc-capabilities-content').css('grid-template-columns', '1fr');
+				}
 
-					$("[name='pp_caps_tab']").val($(this).attr('data-slug'));
+				// Tabs and Content display
+				$(document).on('click', '.ppc-capabilities-tabs > ul > li', function() {
+					var $pp_tab = $(this).attr('data-content');
+					var data_slug = $(this).attr('data-slug');
+
+					$("[name='pp_caps_tab']").val(data_slug);
 
 					// Show current Content
-					$('.ppc-capabilities-content > div').hide();
+					$('.ppc-capabilities-content > div').not('.capabilities-sidebar').hide();
 					$('#' + $pp_tab).show();
+
+					var post_ops = ['read', 'edit', 'delete', 'list'];
+					$('.capabilities-sidebar .ppc-post-types').toggle(post_ops.indexOf(data_slug,) != -1);
+
+					$('.capabilities-sidebar .ppc-taxonomies').toggle(data_slug == 'taxonomies');
+					$('.capabilities-sidebar .ppc-detailed-taxonomies').toggle(data_slug == 'taxonomies');
+
+					if ($(this).hasClass('ppc-full-width')) {
+						$('.capabilities-sidebar').hide();
+						$('#ppc-capabilities-wrapper .ppc-capabilities-content').css('grid-template-columns', '1fr');
+					} else {
+						$('.capabilities-sidebar').show();
+
+						if ($(window).width() > 1199) {
+							$('#ppc-capabilities-wrapper .ppc-capabilities-content').css('grid-template-columns', '1fr 200px 70px');
+						}
+					}
 
 					$('#' + $pp_tab + '-taxonomy').show();
 
 					// Active current Tab
 					$('.ppc-capabilities-tabs > ul > li').removeClass('ppc-capabilities-tab-active');
 					$(this).addClass('ppc-capabilities-tab-active');
+
+					// Add search functionality
+					var searchTerm = $('#pp-global-capability-search').val().trim();
+					if (searchTerm.length >= 2) {
+						// Handle special case for taxonomies tab
+						var filterInputId = (data_slug === 'taxonomies') ?
+							'cme-cap-type-tables-' + data_slug + '-taxonomy .ppc-filter-text' :
+							'cme-cap-type-tables-' + data_slug + ' .ppc-filter-text';
+						var $filterInput = $(filterInputId);
+						if ($filterInput.length > 0) {
+							$filterInput.val(searchTerm).trigger('input');
+						}
+					}
+
+					// Scroll to content area (for responsive display)
+					if ($(window).width() <= 1199) {
+						$([document.documentElement, document.body]).animate({
+							scrollTop: $("#capabilities_content").offset().top - 20
+						}, 500);
+					}
 				});
+
+				// Tab capabilities counting
+				function updateTabCounts() {
+					$('.ppc-capabilities-tabs > ul > li').each(function() {
+						var $tab = $(this);
+						var tabSlug = $tab.data('slug');
+						var $content = $('#' + $tab.data('content'));
+
+						// Count checked checkboxes in this tab's content
+						var checkedCount = $content.find('input[type="checkbox"]:checked').length;
+
+						// Remove existing count and title wrapper if present
+						$tab.find('.pp-capabilities-count-indicator').remove();
+						$tab.find('.tab-title').contents().unwrap();
+
+						// Wrap existing text in title span
+						$tab.contents().filter(function() {
+							return this.nodeType === 3 && this.textContent.trim() !== '';
+						}).wrap('<span class="tab-title"></span>');
+
+						// Add count if > 0
+						if (checkedCount > 0) {
+							$tab.append(' <span class="pp-capabilities-count-container"><span class="pp-capabilities-count-indicator">' + checkedCount + '</span></span>');
+						} else {
+							$tab.append(' <span class="pp-capabilities-count-container"></span>');
+						}
+					});
+				}
+
+				// Initialize tab capabilities counting
+				updateTabCounts();
 			});
 			/* ]]> */
 			</script>
 
 			<div id="ppc-capabilities-wrapper" class="postbox">
 				<div class="ppc-capabilities-tabs">
-					<ul>
+					<ul style="min-width: 220px;">
 						<?php
+						$full_width_tabs = apply_filters('pp_capabilities_full_width_tabs', []);
+
 						if (empty($_REQUEST['pp_caps_tab']) && !empty($_REQUEST['added'])) {
 							$active_tab_slug = 'additional';
 						} else {
@@ -305,9 +486,19 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 						// caps: edit, delete, read
 						foreach( array_keys($cap_properties) as $cap_type ) {
 							$tab_id = "cme-cap-type-tables-$cap_type";
-							$tab_active = ($tab_id == $active_tab_id) ? $ppc_tab_active : '';
+							$classes = [];
 
-							echo '<li data-slug="'. esc_attr($cap_type) . '"' . ' data-content="cme-cap-type-tables-' . esc_attr($cap_type) . '" class="' . esc_attr($tab_active) . '">'
+							if ($tab_id == $active_tab_id) {
+								$classes []= $ppc_tab_active;
+							}
+
+							if (!empty($full_width_tabs[$cap_type])) {
+								$classes []= 'ppc-full-width';
+							}
+
+							$class = implode(' ', $classes);
+
+							echo '<li data-slug="'. esc_attr($cap_type) . '"' . ' data-content="cme-cap-type-tables-' . esc_attr($cap_type) . '" class="' . esc_attr($class) . '">'
 								. esc_html($cap_type_names[$cap_type]) .
 							'</li>';
 						}
@@ -317,9 +508,20 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 								$tab_slug = esc_attr($tab_slug);
 
 								$tab_id = "cme-cap-type-tables-{$tab_slug}";
-								$tab_active = ($tab_id == $active_tab_id) ? $ppc_tab_active : '';
 
-								echo '<li data-slug="' . esc_attr($tab_slug) . '"' . ' data-content="' . esc_attr($tab_id) . '" class="' . esc_attr($tab_active) . '">'
+								$classes = [];
+
+								if ($tab_id == $active_tab_id) {
+									$classes []= $ppc_tab_active;
+								}
+
+								if (!empty($full_width_tabs[$tab_slug])) {
+									$classes []= 'ppc-full-width';
+								}
+
+								$class = implode(' ', $classes);
+
+								echo '<li data-slug="' . esc_attr($tab_slug) . '"' . ' data-content="' . esc_attr($tab_id) . '" class="' . esc_attr($class) . '">'
 								. esc_html($tab_caption) .
 								'</li>';
 							}
@@ -348,7 +550,6 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 
                         //add users related caps
                         $grouped_caps['Users'] = [
-                            'add_users',
                             'create_users',
                             'delete_users',
                             'edit_users',
@@ -408,13 +609,44 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 							];
                             $grouped_caps_lists = array_merge($grouped_caps_lists, $grouped_caps['Multisite']);
                         }
-                        
+
 						$grouped_caps = apply_filters('cme_grouped_capabilities', $grouped_caps);
 
 						foreach($grouped_caps as $grouped_title => $__grouped_caps) {
-							$grouped_title = esc_html($grouped_title);
+							$tab_slug = pp_capabilities_convert_to_slug(sanitize_title($grouped_title));
+							switch ($grouped_title) {
+								case 'Comments' :
+									$grouped_title = __('Comments');
+									break;
 
-							$tab_slug = str_replace(' ', '-', strtolower(sanitize_title($grouped_title)));
+								case 'Media' :
+									$grouped_title = __('Media');
+									break;
+
+								case 'Users' :
+									$grouped_title = __('Users');
+									break;
+
+								case 'Themes' :
+									$grouped_title = __('Themes');
+									break;
+
+								case 'Plugins' :
+									$grouped_title = __('Plugins');
+									break;
+
+								case 'Multisite' :
+									$grouped_title = esc_html__('Multisite', 'capability-manager-enhanced');
+									break;
+
+								case 'Admin' :
+									$grouped_title = esc_html__('Admin', 'capability-manager-enhanced');
+									break;
+
+								default:
+									$grouped_title = esc_html($grouped_title);
+							}
+
 							$tab_id = 'cme-cap-type-tables-' . $tab_slug;
 							$tab_active = ($tab_id == $active_tab_id) ? $ppc_tab_active : '';
 
@@ -423,259 +655,83 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 							'</li>';
 						}
 
-						// caps: plugins
-						$plugin_caps = [];
-
-						//PublishPress Capabilities Capabilities
-						$plugin_caps['PublishPress Capabilities'] = apply_filters('cme_publishpress_capabilities_capabilities', []);
-
-						if (defined('PUBLISHPRESS_VERSION')) {
-							$plugin_caps['PublishPress Planner'] = apply_filters('cme_publishpress_capabilities',
-                               [
-                                    'edit_metadata',
-                                    'edit_post_subscriptions',
-                                    'pp_manage_roles',
-                                    'pp_set_notification_channel',
-                                    'pp_view_calendar',
-                                    'pp_view_content_overview',
-								]
-							);
-						}
-
-						if (defined('PUBLISHPRESS_MULTIPLE_AUTHORS_VERSION')) {
-							if ($_caps = apply_filters('cme_multiple_authors_capabilities', [])) {
-								$plugin_caps['PublishPress Authors'] = $_caps;
+						$sort_publishpress_plugin_caps = static function ($plugin_caps) {
+							if (!is_array($plugin_caps) || empty($plugin_caps)) {
+								return $plugin_caps;
 							}
-						}
 
-						if (defined('PRESSPERMIT_VERSION')) {
-							$plugin_caps['PublishPress Permissions'] = apply_filters('cme_presspermit_capabilities',
-								[
-                                    'edit_own_attachments',
-                                    'list_others_unattached_files',
-                                    'pp_administer_content',
-                                    'pp_assign_roles',
-                                    'pp_associate_any_page',
-                                    'pp_create_groups',
-                                    'pp_create_network_groups',
-                                    'pp_define_moderation',
-                                    'pp_define_post_status',
-                                    'pp_define_privacy',
-                                    'pp_delete_groups',
-                                    'pp_edit_groups',
-                                    'pp_exempt_edit_circle',
-                                    'pp_exempt_read_circle',
-                                    'pp_force_quick_edit',
-                                    'pp_list_all_files',
-                                    'pp_manage_capabilities',
-                                    'pp_manage_members',
-                                    'pp_manage_network_members',
-                                    'pp_manage_settings',
-                                    'pp_moderate_any',
-                                    'pp_set_associate_exceptions',
-                                    'pp_set_edit_exceptions',
-                                    'pp_set_read_exceptions',
-                                    'pp_set_revise_exceptions',
-                                    'pp_set_term_assign_exceptions',
-                                    'pp_set_term_associate_exceptions',
-                                    'pp_set_term_manage_exceptions',
-                                    'pp_unfiltered',
-                                    'set_posts_status',
-								]
-							);
-						}
+							$publishpress_capabilities_key = null;
 
-						if (defined('GF_PLUGIN_DIR_PATH')) {
-							$plugin_caps['Gravity Forms'] = apply_filters('cme_gravityforms_capabilities',
-								[
-                                        'gravityforms_create_form',
-                                        'gravityforms_delete_forms',
-                                        'gravityforms_edit_forms',
-                                        'gravityforms_preview_forms',
-                                        'gravityforms_view_entries',
-                                        'gravityforms_edit_entries',
-                                        'gravityforms_delete_entries',
-                                        'gravityforms_view_entry_notes',
-                                        'gravityforms_edit_entry_notes',
-                                        'gravityforms_export_entries',
-                                        'gravityforms_view_settings',
-                                        'gravityforms_edit_settings',
-                                        'gravityforms_view_updates',
-                                        'gravityforms_view_addons',
-                                        'gravityforms_system_status',
-                                        'gravityforms_uninstall',
-                                        'gravityforms_logging',
-                                        'gravityforms_api_settings',
-								]
-							);
-						}
+							foreach (array_keys($plugin_caps) as $plugin_title_key) {
+								if (0 === strcasecmp(trim((string) $plugin_title_key), 'PublishPress Capabilities')) {
+									$publishpress_capabilities_key = $plugin_title_key;
+									break;
+								}
+							}
 
-						if (defined('WPML_PLUGIN_FILE')) {
-							$plugin_caps['WPML'] = apply_filters('cme_wpml_capabilities',
-								[
-								    'wpml_manage_translation_management',
-                                    'wpml_manage_languages',
-                                    'wpml_manage_translation_options',
-                                    'wpml_manage_troubleshooting',
-                                    'wpml_manage_taxonomy_translation',
-                                    'wpml_manage_wp_menus_sync',
-                                    'wpml_manage_translation_analytics',
-                                    'wpml_manage_string_translation',
-                                    'wpml_manage_sticky_links',
-                                    'wpml_manage_navigation',
-                                    'wpml_manage_theme_and_plugin_localization',
-                                    'wpml_manage_media_translation',
-                                    'wpml_manage_support',
-                                    'wpml_manage_woocommerce_multilingual',
-                                    'wpml_operate_woocommerce_multilingual',
-								]
-							);
-						}
+							if (null === $publishpress_capabilities_key) {
+								return $plugin_caps;
+							}
 
-						if (defined('WS_FORM_VERSION')) {
-							$plugin_caps['WS Form'] = apply_filters('cme_wsform_capabilities',
-								[
-								    'create_form',
-                                    'delete_form',
-                                    'edit_form',
-                                    'export_form',
-                                    'import_form',
-                                    'publish_form',
-                                    'read_form',
-                                    'delete_submission',
-                                    'edit_submission',
-                                    'export_submission',
-                                    'read_submission',
-                                    'manage_options_wsform',
-								]
-							);
-						}
+							$sorted_plugin_caps = [
+								$publishpress_capabilities_key => $plugin_caps[$publishpress_capabilities_key],
+							];
 
-						if (defined('STAGS_VERSION')) {
-							$plugin_caps['TaxoPress'] = apply_filters('cme_taxopress_capabilities',
-								[
-									'simple_tags',
-                                    'admin_simple_tags'
-								]
-							);
-						}
+							foreach ($plugin_caps as $plugin_title_key => $plugin_cap_values) {
+								if ($plugin_title_key === $publishpress_capabilities_key) {
+									continue;
+								}
 
-						if (defined('WC_PLUGIN_FILE')) {
-							$plugin_caps['WooCommerce'] = apply_filters('cme_woocommerce_capabilities',
-								[
-                                    'assign_product_terms',
-                                    'assign_shop_coupon_terms',
-                                    'assign_shop_discount_terms',
-                                    'assign_shop_order_terms',
-                                    'assign_shop_payment_terms',
-                                    'create_shop_orders',
-                                    'delete_others_products',
-                                    'delete_others_shop_coupons',
-                                    'delete_others_shop_discounts',
-                                    'delete_others_shop_orders',
-                                    'delete_others_shop_payments',
-                                    'delete_private_products',
-                                    'delete_private_shop_coupons',
-                                    'delete_private_shop_orders',
-                                    'delete_private_shop_discounts',
-                                    'delete_private_shop_payments',
-                                    'delete_product_terms',
-                                    'delete_products',
-                                    'delete_published_products',
-                                    'delete_published_shop_coupons',
-                                    'delete_published_shop_discounts',
-                                    'delete_published_shop_orders',
-                                    'delete_published_shop_payments',
-                                    'delete_shop_coupons',
-                                    'delete_shop_coupon_terms',
-                                    'delete_shop_discount_terms',
-                                    'delete_shop_discounts',
-                                    'delete_shop_order_terms',
-                                    'delete_shop_orders',
-                                    'delete_shop_payments',
-                                    'delete_shop_payment_terms',
-                                    'edit_others_products',
-                                    'edit_others_shop_coupons',
-                                    'edit_others_shop_discounts',
-                                    'edit_others_shop_orders',
-                                    'edit_others_shop_payments',
-                                    'edit_private_products',
-                                    'edit_private_shop_coupons',
-                                    'edit_private_shop_discounts',
-                                    'edit_private_shop_orders',
-                                    'edit_private_shop_payments',
-                                    'edit_product_terms',
-                                    'edit_products',
-                                    'edit_published_products',
-                                    'edit_published_shop_coupons',
-                                    'edit_published_shop_discounts',
-                                    'edit_published_shop_orders',
-                                    'edit_published_shop_payments',
-                                    'edit_shop_coupon_terms',
-                                    'edit_shop_coupons',
-                                    'edit_shop_discounts',
-                                    'edit_shop_discount_terms',
-                                    'edit_shop_order_terms',
-                                    'edit_shop_orders',
-                                    'edit_shop_payments',
-                                    'edit_shop_payment_terms',
-                                    'export_shop_payments',
-                                    'export_shop_reports',
-                                    'import_shop_discounts',
-                                    'import_shop_payments',
-                                    'manage_product_terms',
-                                    'manage_shop_coupon_terms',
-                                    'manage_shop_discounts',
-                                    'manage_shop_discount_terms',
-                                    'manage_shop_payment_terms',
-                                    'manage_shop_order_terms',
-                                    'manage_shop_settings',
-                                    'manage_woocommerce',
-                                    'publish_products',
-                                    'publish_shop_coupons',
-                                    'publish_shop_discounts',
-                                    'publish_shop_orders',
-                                    'publish_shop_payments',
-                                    'read_private_products',
-                                    'read_private_shop_coupons',
-                                    'read_private_shop_discounts',
-                                    'read_private_shop_payments',
-                                    'read_private_shop_orders',
-                                    'view_admin_dashboard',
-                                    'view_shop_discount_stats',
-                                    'view_shop_payment_stats',
-                                    'view_shop_reports',
-                                    'view_shop_sensitive_data',
-                                    'view_woocommerce_reports',
-								]
-							);
-						}
-						$plugin_caps = apply_filters('cme_plugin_capabilities', $plugin_caps);
+								if (0 === stripos((string) $plugin_title_key, 'PublishPress')) {
+									$sorted_plugin_caps[$plugin_title_key] = $plugin_cap_values;
+								}
+							}
+
+							foreach ($plugin_caps as $plugin_title_key => $plugin_cap_values) {
+								if (array_key_exists($plugin_title_key, $sorted_plugin_caps)) {
+									continue;
+								}
+
+								$sorted_plugin_caps[$plugin_title_key] = $plugin_cap_values;
+							}
+
+							return $sorted_plugin_caps;
+						};
+
+						// caps: plugins
+						$plugin_caps =  apply_filters('cme_plugin_capabilities', []);
+						$plugin_caps = $sort_publishpress_plugin_caps($plugin_caps);
+
 						foreach($plugin_caps as $plugin_title => $__plugin_caps) {
 							$plugin_title = esc_html($plugin_title);
 
-							$tab_slug = str_replace(' ', '-', strtolower(sanitize_title($plugin_title)));
+							$tab_slug = pp_capabilities_convert_to_slug(sanitize_title($plugin_title));
 							$tab_id = 'cme-cap-type-tables-' . $tab_slug;
+							$tab_name = esc_html(str_replace('_', ' ', $plugin_title));
+							// support extractor staging label
+							$tab_name = str_replace('(CAPABILITYEXTRACTOR)', '<span class="capability-extractor-label">CE</span>', $tab_name);
 							$tab_active = ($tab_id == $active_tab_id) ? $ppc_tab_active : '';
 
+							// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 							echo '<li data-slug="' . esc_attr($tab_slug) . '" data-content="' . esc_attr($tab_id) . '" class="' . esc_attr($tab_active) . '">'
-								. esc_html(str_replace('_', ' ', $plugin_title)) .
+								. $tab_name .
 							'</li>';
 						}
 
 						$tab_id = "cme-cap-type-tables-invalid";
 						$tab_active = ($tab_id == $active_tab_id) ? $ppc_tab_active : '';
-						$tab_caption = esc_html__( 'Invalid Capabilities', 'capsman-enhanced' );
+						$tab_caption = esc_html__( 'Invalid Capabilities', 'capability-manager-enhanced' );
 						echo '<li id="cme_tab_invalid_caps" data-slug="invalid" data-content="' . esc_attr($tab_id) . '" class="' . esc_attr($tab_active) . '" style="display:none;">' . esc_html($tab_caption) . '</li>';
 
 						$tab_id = "cme-cap-type-tables-additional";
 						$tab_active = ($tab_id == $active_tab_id) ? $ppc_tab_active : '';
-						$tab_caption = esc_html__( 'Additional', 'capsman-enhanced' );
+						$tab_caption = esc_html__( 'Additional', 'capability-manager-enhanced' );
 						echo '<li data-slug="additional" data-content="' . esc_attr($tab_id) . '" class="' . esc_attr($tab_active) . '">' . esc_html($tab_caption) . '</li>';
 						?>
 					</ul>
 				</div>
-				<div class="ppc-capabilities-content">
+
+				<div id="capabilities_content" class="ppc-capabilities-content">
 					<?php
 					// caps: read, edit, deletion
 					foreach( array_keys($cap_properties) as $cap_type ) {
@@ -689,7 +745,7 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 							if ( ! count( $cap_properties[$cap_type][$item_type] ) )
 								continue;
 
-							$tab_id = "cme-cap-type-tables-$cap_type";
+							$tab_id = "cme-cap-type-tables-" . pp_capabilities_convert_to_slug($cap_type);
 							$div_display = ($tab_id == $active_tab_id) ? 'block' : 'none';
 
 							$any_caps = false;
@@ -702,25 +758,31 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 
 							echo "<div id='" . esc_attr($tab_id) . "' style='display:" . esc_attr($div_display) . ";'>";
 
-							$caption_pattern = ('taxonomy' == $item_type) ? esc_html__('Term %s Capabilities', 'capsman-enhanced') : esc_html__('Post %s Capabilities', 'capsman-enhanced');
+							if ('taxonomy' == $item_type) {
+								$caption_pattern = esc_html__('Term %s Capabilities', 'capability-manager-enhanced');
+							} else {
+								$caption_pattern = (in_array($cap_type, ['copy', 'revise']))
+								? esc_html__('%s Capabilities', 'capability-manager-enhanced')
+							 	: esc_html__('Post %s Capabilities', 'capability-manager-enhanced');
+							}
 
-							echo '<h3>' .  sprintf($caption_pattern, esc_html($cap_type_names[$cap_type])) . '</h3>';
+							$cap_type_name = ('taxonomies' == $cap_type) ? esc_html__('Taxonomy', 'capability-manager-enhanced') : $cap_type_names[$cap_type];
 
-                            if ($cap_type === 'list' && defined('PRESSPERMIT_ACTIVE')) {
-                                echo '<p class="description"> '. esc_html__('Admin listing access is normally provided by the "Edit" capabilities. "List" capabilities apply if the corresponding "Edit" capability is missing, but otherwise have no effect.', 'capsman-enhanced') .' </p>';
-                            }
+							echo '<h3>' .  sprintf($caption_pattern, esc_html($cap_type_name)) . '</h3>';
 
 							echo '<div class="ppc-filter-wrapper">';
 								echo '<select class="ppc-filter-select">';
-									$filter_caption = ('taxonomy' == $item_type) ? __('Filter by taxonomy', 'capsman-enhanced') : __('Filter by post type', 'capsman-enhanced');
+									$filter_caption = ('taxonomy' == $item_type) ? __('Filter by taxonomy', 'capability-manager-enhanced') : __('Filter by post type', 'capability-manager-enhanced');
 									echo '<option value="">' . esc_html($filter_caption) . '</option>';
 								echo '</select>';
-								echo ' <button class="button secondary-button ppc-filter-select-reset" type="button">' . esc_html__('Clear', 'capsman-enhanced') . '</button>';
+								echo ' <button class="button secondary-button ppc-filter-select-reset" type="button">' . esc_html__('Clear') . '</button>';
 							echo '</div>';
 
-							echo "<table class='widefat fixed striped cme-typecaps cme-typecaps-" . esc_attr($cap_type) . "'>";
+							echo "<table class='widefat striped cme-typecaps cme-typecaps-basic cme-typecaps-" . esc_attr($cap_type) . "'>";
 
-							echo '<thead><tr><th></th>';
+							echo '<thead><tr><th class="pp-header-checkall">';
+							echo '<input type="checkbox" name="pp_toggle_all" class="excluded-input" autocomplete="off"> &nbsp;';
+							echo '</th>';
 
 							// label cap properties
 							foreach( $cap_properties[$cap_type][$item_type] as $prop ) {
@@ -733,9 +795,18 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 									continue;
 								}
 
-								$tip = ( isset( $cap_tips[$prop] ) ) ? $cap_tips[$prop] : '';
 								$th_class = ( 'taxonomy' == $item_type ) ? 'term-cap' : 'post-cap';
-								echo "<th style='text-align:center;' title='" . esc_attr($tip) . "' class='" . esc_attr($th_class) . "'>";
+
+								$tip_text = '';
+								if ( isset( $cap_tips[$prop] ) ) {
+									$th_class .= ' ppc-tool-tip';
+									$tip_text = '<div class="tool-tip-text">
+										<p>'. $cap_tips[$prop] .'</p>
+										<i></i>
+									</div>';
+								}
+
+								echo "<th style='text-align:center;' class='" . esc_attr($th_class) . "'>" . $tip_text;
 
 								if ( ( 'delete' != $prop ) || ( 'taxonomy' != $item_type ) || cme_get_detailed_taxonomies() ) {
 									echo str_replace('_', '<br />', esc_html(ucwords($prop)));
@@ -752,7 +823,7 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 
 								if (in_array($cap_type, ['copy', 'revise'])) {
 									global $revisionary;
-									
+
 									if (!empty($revisionary) && !empty($revisionary->enabled_post_types) && empty($revisionary->enabled_post_types[$key])) {
 										continue;
 									}
@@ -766,7 +837,7 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
                                         continue;
                                     }
 
-                                    if (defined('PRESSPERMIT_ACTIVE')) {
+                                    if (defined('PRESSPERMIT_VERSION') || defined('PRESSPERMIT_PRO_VERSION')) {
                                         //add list capabilities
                                         if (isset($type_obj->cap->edit_posts) && !isset($type_obj->cap->list_posts)) {
                                             $type_obj->cap->list_posts = str_replace('edit_', 'list_', $type_obj->cap->edit_posts);
@@ -782,31 +853,63 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
                                         }
                                     }
 
-                                    if ($pp_revisions_copy) {
-                                        //add copy capabilities
-                                        if (isset($type_obj->cap->edit_posts) && !isset($type_obj->cap->copy_posts)) {
-                                            $type_obj->cap->copy_posts = str_replace('edit_', 'copy_', $type_obj->cap->edit_posts);
-                                        }
-                                        if (isset($type_obj->cap->edit_others_posts) && !isset($type_obj->cap->copy_others_posts)) {
-                                            $type_obj->cap->copy_others_posts = str_replace('edit_', 'copy_', $type_obj->cap->edit_others_posts);
-                                        }
-                                    }
-                        
-                                    if ($pp_revisions_revise) {
-                                        //add revise capabilities
-                                        if (isset($type_obj->cap->edit_posts) && !isset($type_obj->cap->revise_posts)) {
-                                            $type_obj->cap->revise_posts = str_replace('edit_', 'revise_', $type_obj->cap->edit_posts);
-                                        }
-                                        if (isset($type_obj->cap->edit_others_posts) && !isset($type_obj->cap->revise_others_posts)) {
-                                            $type_obj->cap->revise_others_posts = str_replace('edit_', 'revise_', $type_obj->cap->edit_others_posts);
-                                        }
-                                    }
+									if ($pp_revisions_copy) {
+										//add copy capabilities
+										if (isset($type_obj->cap->edit_posts) && !isset($type_obj->cap->copy_posts)) {
+											$type_obj->cap->copy_posts = str_replace('edit_', 'copy_', $type_obj->cap->edit_posts);
+										}
+										if (isset($type_obj->cap->edit_others_posts) && !isset($type_obj->cap->copy_others_posts)) {
+											$type_obj->cap->copy_others_posts = str_replace('edit_', 'copy_', $type_obj->cap->edit_others_posts);
+										}
+									}
 
-									$type_label = (defined('CME_LEGACY_MENU_NAME_LABEL') && !empty($type_obj->labels->menu_name)) ? $type_obj->labels->menu_name : $type_obj->labels->name;
+									if ($pp_revisions_revise) {
+										//add revise capabilities
+										if (isset($type_obj->cap->edit_posts) && !isset($type_obj->cap->revise_posts)) {
+											$type_obj->cap->revise_posts = str_replace('edit_', 'revise_', $type_obj->cap->edit_posts);
+										}
+										if (isset($type_obj->cap->edit_others_posts) && !isset($type_obj->cap->revise_others_posts)) {
+											$type_obj->cap->revise_others_posts = str_replace('edit_', 'revise_', $type_obj->cap->edit_others_posts);
+										}
+									}
+
+									if ($pp_revisions_approve) {
+										//add approve capabilities
+										if (isset($type_obj->cap->edit_posts) && !isset($type_obj->cap->approve_posts)) {
+											$type_obj->cap->approve_posts = str_replace('edit_', 'approve_', $type_obj->cap->edit_posts);
+										}
+										if (isset($type_obj->cap->edit_others_posts) && !isset($type_obj->cap->approve_others_posts)) {
+											$type_obj->cap->approve_others_posts = str_replace('edit_', 'approve_', $type_obj->cap->edit_others_posts);
+										}
+									}
+
+									if ('wp_navigation' == $type_obj->name) {
+										$type_label = __('Nav Menus (Block)', 'capability-manager-enhanced');
+									} elseif ('nav_menu' == $type_obj->name) {
+										$type_label = __('Nav Menus (Legacy)', 'capability-manager-enhanced');
+									} else {
+										$type_label = (defined('CME_LEGACY_MENU_NAME_LABEL') && !empty($type_obj->labels->menu_name)) ? $type_obj->labels->menu_name : $type_obj->labels->name;
+									}
+
+									if (!empty($type_obj->name)) {
+										if ('taxonomy' == $item_type) {
+											$type_tooltip = sprintf(__( 'The slug for this taxonomy is %s', 'capability-manager-enhanced' ), '<strong>' . esc_html($type_obj->name) . '</strong>' );
+										} else {
+											$type_tooltip = sprintf(__( 'The slug for this post type is %s', 'capability-manager-enhanced' ), '<strong>' . esc_html($type_obj->name) . '</strong>' );
+										}
+										$type_tooltip_class = 'ppc-tool-tip disabled';
+										$type_tooltip_msg  = '<span class="tool-tip-text">
+										<p>'. $type_tooltip .'</p>
+										<i></i>
+									</span>';
+									} else {
+										$type_tooltip_class = '';
+										$type_tooltip_msg  = '';
+									}
 
 									$row .= "<td>";
 									$row .= '<input type="checkbox" class="pp-row-action-rotate excluded-input"> &nbsp;';
-									$row .= "<a class='cap_type' href='#toggle_type_caps'>" . esc_html($type_label) . '</a>';
+									$row .= "<span class='{$type_tooltip_class}'><a class='cap_type' href='#toggle_type_caps'>" . esc_html($type_label) . '</a> '. $type_tooltip_msg .'</span>';
 									$row .= '<a style="display: none;" href="#" class="neg-type-caps">&nbsp;x&nbsp;</a>';
 									$row .= '</td>';
 
@@ -817,10 +920,12 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 										$td_classes = array();
 										$checkbox = '';
 										$cap_title = '';
+										$disabled_cap = false;
 
                                         if ($type_obj->name === 'attachment') {
                                             $attachement_cap_position++;
                                         }
+
 										if ( ! empty($type_obj->cap->$prop) && ( in_array( $type_obj->name, array( 'post', 'page' ) )
 										|| ! in_array( $type_obj->cap->$prop, $default_caps )
 										|| ( ( 'manage_categories' == $type_obj->cap->$prop ) && ( 'manage_terms' == $prop ) && ( 'category' == $type_obj->name ) ) ) ) {
@@ -846,32 +951,36 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 												|| $type_obj->cap->$prop == str_replace( '_posts', "_" . _cme_get_plural($type_obj->name, $type_obj), $prop )
 												|| $type_obj->cap->$prop == str_replace( '_pages', "_" . _cme_get_plural($type_obj->name, $type_obj), $prop )
 												)
-                                            && (!in_array($type_obj->cap->$prop, $grouped_caps_lists)) //capabilitiy not enforced in $grouped_caps_lists
+                                            && (!in_array($type_obj->cap->$prop, $grouped_caps_lists)) //capability not enforced in $grouped_caps_lists
+											&& (('manage_post_tags' != $type_obj->cap->$prop) || ('post_tag' == $type_obj->name))
 											) {
 												// only present these term caps up top if we are ensuring that they get enforced separately from manage_terms
 												if ( in_array( $prop, array( 'edit_terms', 'delete_terms', 'assign_terms' ) ) && ( ! in_array( $type_obj->name, cme_get_detailed_taxonomies() ) || defined( 'OLD_PRESSPERMIT_ACTIVE' ) ) ) {
 													continue;
 												}
 
-												$cap_name = sanitize_key($type_obj->cap->$prop);
+												$cap_name = sanitize_text_field($type_obj->cap->$prop);
+												$set_application_password_cap($cap_name);
 
 												if ( 'taxonomy' == $item_type )
 													$td_classes []= "term-cap";
 												else
 													$td_classes []= "post-cap";
 
-												if ( ! empty($pp_metagroup_caps[$cap_name]) )
-													$td_classes []='cm-has-via-pp';
-
 												if ( $is_administrator || current_user_can($cap_name) ) {
+													$chk_classes = [];
+
                                                     $cap_title = '';
-													if ( ! empty($pp_metagroup_caps[$cap_name]) ) {
-														$tool_tip = sprintf(__( '%s: assigned by Permission Group', 'capsman-enhanced' ), '<strong>' . $cap_name . '</strong>' );
+													if (! empty($pp_metagroup_caps[$cap_name]) ) {
+														$tool_tip = sprintf(__( '%s: assigned by Permission Group', 'capability-manager-enhanced' ), '<strong>' . $cap_name . '</strong>' );
+														$chk_classes []= 'cm-has-via-pp';
 													} else {
-														$tool_tip = sprintf(__( 'This capability is %s', 'capsman-enhanced' ), '<strong>' . $cap_name . '</strong>' );
+														$tool_tip = sprintf(__( 'This capability is %s', 'capability-manager-enhanced' ), '<strong>' . $cap_name . '</strong>' );
 													}
 
-                                                    $checkbox = '<div class="ppc-tool-tip disabled"><input type="checkbox" name="caps[' . esc_attr($cap_name) . ']" autocomplete="off" value="1" ' . checked(1, ! empty($rcaps[$cap_name]), false ) . ' />
+													$chk_class = ( $chk_classes ) ? ' class="' . implode(' ', $chk_classes) . '"' : '';
+
+                                                    $checkbox = '<div class="ppc-tool-tip disabled"><input type="checkbox"' . $chk_class . ' name="caps[' . esc_attr($cap_name) . ']" autocomplete="off" value="1" ' . checked(1, ! empty($rcaps[$cap_name]), false ) . ' />
                                                         <div class="tool-tip-text">
                                                             <p>'. $tool_tip .'</p>
                                                             <i></i>
@@ -881,6 +990,7 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 													$type_caps [$cap_name] = true;
 													$display_row = true;
 													$any_caps = true;
+													$disabled_cap = false;
 												}
 											} else {
 
@@ -888,11 +998,19 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 												if ( in_array( $prop, array( 'edit_terms', 'delete_terms', 'assign_terms' ) ) && ( ! in_array( $type_obj->name, cme_get_detailed_taxonomies() ) || defined( 'OLD_PRESSPERMIT_ACTIVE' ) ) ) {
 													continue;
 												}
-                                                
+
+												$disabled_cap = true;
                                                 $display_row = true;
-                                                $cap_name = sanitize_key($type_obj->cap->$prop);
+                                                $cap_name = sanitize_text_field($type_obj->cap->$prop);
+												$set_application_password_cap($cap_name);
 												$cap_title = '';
-                                                $tool_tip  = sprintf( __( 'This capability is controlled by %s Use the sidebar settings to allow this to be controlled independently.', 'capsman-enhanced' ), '<strong>' . $cap_name . '</strong>.<br /><br />' );
+
+												if (($cap_name === 'manage_categories') && !defined('PRESSPERMIT_ACTIVE')) {
+													$tool_tip = sprintf(__( 'This capability is controlled by %s', 'capability-manager-enhanced' ), '<strong>manage_categories</strong>' );
+
+												} else {
+													$tool_tip  = sprintf(__('This capability is controlled by %s Use the sidebar settings to allow this to be controlled independently.', 'capability-manager-enhanced'), '<strong>' . $cap_name . '</strong>.<br /><br />');
+												}
 
                                                 $checkbox = '<div class="ppc-tool-tip disabled"><input disabled class="disabled" type="checkbox" ' . checked(1, ! empty($rcaps[$cap_name]), false ) . ' />
                                                     <div class="tool-tip-text">
@@ -908,13 +1026,13 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 										} else {
                                             if ($type_obj->name === 'attachment') {
                                                 if ($attachement_cap_position === 1 || $attachement_cap_position === 3) {
-                                                    $tool_tip  =__('Use the sidebar settings to allow this to be controlled independently.', 'capsman-enhanced');
+                                                    $tool_tip  =__('Use the sidebar settings to allow this to be controlled independently.', 'capability-manager-enhanced');
                                                 } else {
-                                                    $tool_tip  =__('This capability is not available for this post type.', 'capsman-enhanced');
+                                                    $tool_tip  =__('This capability is not available for this post type.', 'capability-manager-enhanced');
                                                 }
 
                                             } else {
-                                                $tool_tip  =__('This capability is not available for this post type.', 'capsman-enhanced');
+                                                $tool_tip  =__('This capability is not available for this post type.', 'capability-manager-enhanced');
                                             }
                                             $checkbox = '<div class="ppc-tool-tip disabled">&nbsp; &nbsp; &nbsp; &nbsp;
                                                 <div class="tool-tip-text">
@@ -930,9 +1048,9 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 
 										$td_class = ( $td_classes ) ? implode(' ', $td_classes) : '';
 
-										$row .= '<td class="' . esc_attr($td_class) . '" title="' . esc_attr($cap_title) . '"' . "><span class='cap-x'>X</span>$checkbox";
+										$row .= '<td class="' . esc_attr($td_class) . '" title="' . esc_attr($cap_title) . '"' . "><span class='ppc-tool-tip disabled cap-x'>X</span>$checkbox";
 
-										if ( false !== strpos( $td_class, 'cap-neg' ) )
+										if ( !$disabled_cap && false !== strpos( $td_class, 'cap-neg' ) )
 											$row .= '<input type="hidden" class="cme-negation-input" name="caps[' . esc_attr($cap_name) . ']" value="" />';
 
 										$row .= "</td>";
@@ -976,6 +1094,13 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 							}
 
 							echo '</table>';
+
+							if ($cap_type === 'list' && defined('PRESSPERMIT_VERSION') && defined('PRESSPERMIT_COLLAB_VERSION')) {
+                                echo '<p class="pp-subtext"> '. esc_html__('Admin listing access is normally provided by the "Edit" capabilities. These "List" capabilities only apply if the corresponding "Edit" capability is missing. Also, these "List" capabilities can grant access, but not deny access.', 'capability-manager-enhanced') .' </p>';
+                            }
+
+							do_action('publishpress-caps_manager_postcaps_table', $cap_type, $item_type, compact('current', 'rcaps', 'pp_metagroup_caps', 'is_administrator', 'default_caps', 'custom_types', 'defined', 'unfiltered', 'pp_metagroup_caps', 'active_tab_id'));
+
 							echo '</div>';
 
 							if ($item_type == 'taxonomy') {
@@ -1003,11 +1128,44 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 					$grouped_caps = apply_filters('cme_grouped_capabilities', $grouped_caps);
 
 					foreach($grouped_caps as $grouped_title => $__grouped_caps) {
-						$grouped_title = esc_html($grouped_title);
+
+						$tab_id = 'cme-cap-type-tables-' . esc_attr(pp_capabilities_convert_to_slug($grouped_title));
+
+						switch ($grouped_title) {
+							case 'Comments' :
+								$grouped_title = __('Comments');
+								break;
+
+							case 'Media' :
+								$grouped_title = __('Media');
+								break;
+
+							case 'Users' :
+								$grouped_title = __('Users');
+								break;
+
+							case 'Themes' :
+								$grouped_title = __('Themes');
+								break;
+
+							case 'Plugins' :
+								$grouped_title = __('Plugins');
+								break;
+
+							case 'Multisite' :
+								$grouped_title = esc_html__('Multisite', 'capability-manager-enhanced');
+								break;
+
+							case 'Admin' :
+								$grouped_title = esc_html__('Admin', 'capability-manager-enhanced');
+								break;
+
+							default:
+								$grouped_title = esc_html($grouped_title);
+						}
 
 						$_grouped_caps = array_fill_keys($__grouped_caps, true);
 
-						$tab_id = 'cme-cap-type-tables-' . esc_attr(str_replace( ' ', '-', strtolower($grouped_title)));
 						$div_display = ($tab_id == $active_tab_id) ? 'block' : 'none';
 
 						echo '<div id="' . esc_attr($tab_id) . '" style="display:' . esc_attr($div_display) . '">';
@@ -1015,10 +1173,10 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 						echo '<h3 class="cme-cap-section">' . esc_html(str_replace('_', ' ', $grouped_title)) . '</h3>';
 
 						echo '<div class="ppc-filter-wrapper">';
-							echo '<input type="text" class="regular-text ppc-filter-text" placeholder="' . esc_attr__('Filter by capability', 'capsman-enhanced') . '">';
-							echo ' <button class="button secondary-button ppc-filter-text-reset" type="button">' . esc_html__('Clear', 'capsman-enhanced') . '</button>';
+							echo '<input type="text" class="regular-text ppc-filter-text" placeholder="' . esc_attr__('Filter by capability', 'capability-manager-enhanced') . '">';
+							echo ' <button class="button secondary-button ppc-filter-text-reset" type="button">' . esc_html__('Clear') . '</button>';
 						echo '</div>';
-						echo '<div class="ppc-filter-no-results" style="display:none;">' . esc_html__( 'No results found. Please try again with a different word.', 'capsman-enhanced' ) . '</div>';
+						echo '<div class="ppc-filter-no-results" style="display:none;">' . esc_html__( 'No results found. Please try again with a different word.', 'capability-manager-enhanced' ) . '</div>';
 
 						echo '<table class="widefat fixed striped form-table cme-checklist single-checkbox-table">';
 
@@ -1029,15 +1187,13 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
                         ?>
 						<tr class="cme-bulk-select">
                             <td colspan="<?php echo (int) $checks_per_row;?>">
-                                <input type="checkbox" class="cme-check-all" title="<?php esc_attr_e('check / uncheck all', 'capsman-enhanced');?>"> <span><?php _e('Capability Name', 'capsman-enhanced');?></span>
-								<span style="float:right">
-								&nbsp;&nbsp;<a class="cme-neg-all" href="#" title="<?php esc_attr_e('negate all (storing as disabled capabilities)', 'capsman-enhanced');?>">X</a> <a class="cme-switch-all" href="#" title="<?php esc_attr_e('negate none (add/remove all capabilities normally)', 'capsman-enhanced');?>">X</a>
-								</span>
+                                <input type="checkbox" class="cme-check-all" title="<?php esc_attr_e('check / uncheck / negate all', 'capability-manager-enhanced');?>"> <span><?php _e('Capability Name', 'capability-manager-enhanced');?></span>
 							</td>
 						</tr>
                         <?php
 						foreach( array_keys($_grouped_caps) as $cap_name ) {
-							$cap_name = sanitize_key($cap_name);
+							$cap_name = sanitize_text_field($cap_name);
+							$set_application_password_cap($cap_name);
 
 							if ( isset( $type_caps[$cap_name] ) || isset($type_metacaps[$cap_name]) ) {
 								continue;
@@ -1064,21 +1220,30 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 
 							if ( ! empty($pp_metagroup_caps[$cap_name]) ) {
 								$class .= ' cap-metagroup';
-								$title_text = sprintf( __( '%s: assigned by Permission Group', 'capsman-enhanced' ), $cap_name );
+								$tool_tip = sprintf(__( '%s: assigned by Permission Group', 'capability-manager-enhanced' ), '<strong>' . $cap_name . '</strong>' );
 							} else {
-								$title_text = $cap_name;
+								$tool_tip = sprintf(__( 'This capability is %s', 'capability-manager-enhanced' ), '<strong>' . $cap_name . '</strong>' );
 							}
 
 							$disabled = '';
-							$checked = checked(1, ! empty($rcaps[$cap_name]), false );
-							$cap_title = $title_text;
+							$checked = !empty($rcaps[$cap_name]) ? 'checked' : '';
+							$cap_title = '';
+
+                            $tooltip_html = '
+                                 <div class="tool-tip-text">
+                                    <p>'. $tool_tip .'</p>
+                                    <i></i>
+                                </div>
+                            ';
 							?>
-							<td class="<?php echo esc_attr($class); ?>"><span class="cap-x">X</span><label title="<?php echo esc_attr($cap_title);?>"><input type="checkbox" name="caps[<?php echo esc_attr($cap_name); ?>]" class="pp-single-action-rotate" autocomplete="off" value="1" <?php echo esc_attr($checked) . esc_attr($disabled);?> />
+							<td class="<?php echo esc_attr($class); ?>"><span class="ppc-tool-tip disabled cap-x">X</span><span class="ppc-tool-tip disabled"><label><input type="checkbox" name="caps[<?php echo esc_attr($cap_name); ?>]" class="pp-single-action-rotate" autocomplete="off" value="1" <?php echo esc_attr($checked) . esc_attr($disabled);?> />
 							<span>
 							<?php
 							echo esc_html(str_replace( '_', ' ', $cap_name));
 							?>
-							</span></label><a href="#" class="neg-cap" style="visibility: hidden;">&nbsp;x&nbsp;</a>
+							</span></label>
+								<?php echo $tooltip_html; ?>
+							</span><a href="#" class="neg-cap" style="visibility: hidden;">&nbsp;x&nbsp;</a>
 							<?php if ( false !== strpos( $class, 'cap-neg' ) ) :?>
 								<input type="hidden" class="cme-negation-input" name="caps[<?php echo esc_attr($cap_name); ?>]" value="" />
 							<?php endif; ?>
@@ -1102,10 +1267,7 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 
 						<tr class="cme-bulk-select">
 							<td colspan="<?php echo (int) $checks_per_row;?>">
-								<input type="checkbox" class="cme-check-all" autocomplete="off" title="<?php esc_attr_e('check / uncheck all', 'capsman-enhanced');?>"> <span><?php _e('Capability Name', 'capsman-enhanced');?></span>
-								<span style="float:right">
-								&nbsp;&nbsp;<a class="cme-neg-all" href="#" title="<?php esc_attr_e('negate all (storing as disabled capabilities)', 'capsman-enhanced');?>">X</a> <a class="cme-switch-all" href="#" title="<?php esc_attr_e('negate none (add/remove all capabilities normally)', 'capsman-enhanced');?>">X</a>
-								</span>
+								<input type="checkbox" class="cme-check-all" autocomplete="off" title="<?php esc_attr_e('check / uncheck / negate all', 'capability-manager-enhanced');?>"> <span><?php _e('Capability Name', 'capability-manager-enhanced');?></span>
 							</td>
 						</tr>
 
@@ -1122,13 +1284,13 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 					<div id="<?php echo esc_attr($tab_id);?>" style="display:<?php echo esc_attr($div_display);?>">
 						<?php
 
-						echo '<h3>' . esc_html__( 'WordPress Core Capabilities', 'capsman-enhanced' ) . '</h3>';
+						echo '<h3>' . esc_html__( 'WordPress Core Capabilities', 'capability-manager-enhanced' ) . '</h3>';
 
 						echo '<div class="ppc-filter-wrapper">';
-							echo '<input type="text" class="regular-text ppc-filter-text" placeholder="' . esc_attr__('Filter by capability', 'capsman-enhanced') . '">';
-							echo ' <button class="button secondary-button ppc-filter-text-reset" type="button">' . esc_html__('Clear', 'capsman-enhanced') . '</button>';
+							echo '<input type="text" class="regular-text ppc-filter-text" placeholder="' . esc_attr__('Filter by capability', 'capability-manager-enhanced') . '">';
+							echo ' <button class="button secondary-button ppc-filter-text-reset" type="button">' . esc_html__('Clear') . '</button>';
 						echo '</div>';
-						echo '<div class="ppc-filter-no-results" style="display:none;">' . esc_html__( 'No results found. Please try again with a different word.', 'capsman-enhanced' ) . '</div>';
+						echo '<div class="ppc-filter-no-results" style="display:none;">' . esc_html__( 'No results found. Please try again with a different word.', 'capability-manager-enhanced' ) . '</div>';
 
 						echo '<table class="widefat fixed striped form-table cme-checklist">';
 
@@ -1139,19 +1301,13 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
                         ?>
 						<tr class="cme-bulk-select">
                             <td colspan="<?php echo (int) $checks_per_row;?>">
-                                <input type="checkbox" class="cme-check-all" autocomplete="off" title="<?php esc_attr_e('check / uncheck all', 'capsman-enhanced');?>"> <span><?php _e('Capability Name', 'capsman-enhanced');?></span>
-								<span style="float:right">
-								&nbsp;&nbsp;<a class="cme-neg-all" href="#" title="<?php esc_attr_e('negate all (storing as disabled capabilities)', 'capsman-enhanced');?>">X</a> <a class="cme-switch-all" href="#" title="<?php esc_attr_e('negate none (add/remove all capabilities normally)', 'capsman-enhanced');?>">X</a>
-								</span>
+                                <input type="checkbox" class="cme-check-all" autocomplete="off" title="<?php esc_attr_e('check / uncheck / negate all', 'capability-manager-enhanced');?>"> <span><?php _e('Capability Name', 'capability-manager-enhanced');?></span>
 							</td>
 						</tr>
 
 						<tr class="cme-bulk-select">
 							<td colspan="<?php echo (int) $checks_per_row;?>">
-								<input type="checkbox" class="cme-check-all" autocomplete="off" title="<?php esc_attr_e('check / uncheck all', 'capsman-enhanced');?>"> <span><?php _e('Capability Name', 'capsman-enhanced');?></span>
-								<span style="float:right">
-								&nbsp;&nbsp;<a class="cme-neg-all" href="#" title="<?php esc_attr_e('negate all (storing as disabled capabilities)', 'capsman-enhanced');?>">X</a> <a class="cme-switch-all" href="#" title="<?php esc_attr_e('negate none (add/remove all capabilities normally)', 'capsman-enhanced');?>">X</a>
-								</span>
+								<input type="checkbox" class="cme-check-all" autocomplete="off" title="<?php esc_attr_e('check / uncheck / negate all', 'capability-manager-enhanced');?>"> <span><?php _e('Capability Name', 'capability-manager-enhanced');?></span>
 							</td>
 						</tr>
 
@@ -1164,24 +1320,133 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 
 					// caps: plugins
 					$plugin_caps = apply_filters('cme_plugin_capabilities', $plugin_caps);
+					$plugin_caps = $sort_publishpress_plugin_caps($plugin_caps);
+
+					$plugin_cap_descriptions = apply_filters('cme_capability_descriptions', []);
 
 					foreach($plugin_caps as $plugin_title => $__plugin_caps) {
-						$plugin_title = esc_html($plugin_title);
+						$plugin_title_raw = (string) $plugin_title;
+						$plugin_title = esc_html($plugin_title_raw);
 
-						$_plugin_caps = array_fill_keys($__plugin_caps, true);
+						// Compact for old permission description format
+						//TODO: Remove after permission update their code to new structure
+						if ('PublishPress Permissions' === $plugin_title_raw && function_exists('apply_filters')) {
+							$plugin_cap_descriptions = apply_filters('presspermit_cap_descriptions', $plugin_cap_descriptions);
+						}
 
-						$tab_id = 'cme-cap-type-tables-' . esc_attr(str_replace( ' ', '-', strtolower($plugin_title)));
+						$plugin_cap_payload = (array) $__plugin_caps;
+						$plugin_cap_groups = [];
+						$all_plugin_caps = pp_capabilities_plugin_capability_list($plugin_cap_payload);
+						$_plugin_caps = array_fill_keys($all_plugin_caps, true);
+
+						// Support grouped or single list payload.
+						$is_grouped_payload = false;
+						foreach ($plugin_cap_payload as $payload_caps) {
+							if (is_array($payload_caps)) {
+								$is_grouped_payload = true;
+								break;
+							}
+						}
+
+						if ($is_grouped_payload) {
+							$plugin_cap_groups = function_exists('pp_capabilities_groups_with_descriptions')
+								? pp_capabilities_groups_with_descriptions($plugin_cap_payload, $plugin_cap_descriptions)
+								: $plugin_cap_payload;
+						} else {
+							$plugin_cap_groups = apply_filters(
+								'publishpress_caps_plugin_capability_groups',
+								[],
+								$plugin_title_raw,
+								$all_plugin_caps,
+								$default
+							);
+						}
+
+						$normalized_plugin_cap_groups = [];
+						$plugin_group_cap_descriptions = [];
+						$grouped_plugin_caps = [];
+
+						if (is_array($plugin_cap_groups)) {
+							foreach ($plugin_cap_groups as $group_label => $group_caps) {
+								if (empty($group_caps) || !is_array($group_caps)) {
+									continue;
+								}
+
+								$group_label = sanitize_text_field((string) $group_label);
+								if ('' === $group_label) {
+									continue;
+								}
+
+								$normalized_group_caps = [];
+								foreach ($group_caps as $group_cap_key => $group_cap_value) {
+									$group_cap_description = '';
+
+									if (is_string($group_cap_key) && ('' !== $group_cap_key) && !is_numeric($group_cap_key)) {
+										$group_cap = sanitize_text_field($group_cap_key);
+
+										if (is_string($group_cap_value)) {
+											$group_cap_description = $group_cap_value;
+										} elseif (is_array($group_cap_value) && !empty($group_cap_value['description']) && is_string($group_cap_value['description'])) {
+											$group_cap_description = $group_cap_value['description'];
+										}
+									} else {
+										$group_cap = sanitize_text_field((string) $group_cap_value);
+									}
+
+									if ('' === $group_cap || !isset($_plugin_caps[$group_cap]) || isset($grouped_plugin_caps[$group_cap])) {
+										continue;
+									}
+
+									$normalized_group_caps[] = $group_cap;
+									$grouped_plugin_caps[$group_cap] = true;
+
+									if ('' !== trim($group_cap_description)) {
+										$plugin_group_cap_descriptions[$group_cap] = $group_cap_description;
+									}
+								}
+
+								if (!empty($normalized_group_caps)) {
+									$normalized_plugin_cap_groups[$group_label] = $normalized_group_caps;
+								}
+							}
+						}
+
+						$plugin_cap_group_for_cap = [];
+						$ordered_plugin_caps = [];
+
+						foreach ($normalized_plugin_cap_groups as $group_label => $group_caps) {
+							foreach ($group_caps as $group_cap) {
+								$ordered_plugin_caps[] = $group_cap;
+								$plugin_cap_group_for_cap[$group_cap] = $group_label;
+							}
+						}
+
+						$ungrouped_plugin_caps = array_values(array_diff($all_plugin_caps, array_keys($grouped_plugin_caps)));
+						if (!empty($ungrouped_plugin_caps)) {
+							$general_group_label = __('General', 'capability-manager-enhanced');
+
+							foreach ($ungrouped_plugin_caps as $ungrouped_cap) {
+								$ordered_plugin_caps[] = $ungrouped_cap;
+								$plugin_cap_group_for_cap[$ungrouped_cap] = $general_group_label;
+							}
+						}
+
+						$tab_id = 'cme-cap-type-tables-' . esc_attr(pp_capabilities_convert_to_slug($plugin_title));
+						$tab_name = esc_html(str_replace('_', ' ', $plugin_title_raw));
+						// support extractor staging label
+						$tab_name = str_replace('(CAPABILITYEXTRACTOR)', '<span class="capability-extractor-label">CE</span>', $tab_name);
 						$div_display = ($tab_id == $active_tab_id) ? 'block' : 'none';
 
-						echo '<div id="' . esc_attr($tab_id) . '" style="display:' . esc_attr($div_display) . '">';
+						echo '<div id="' . esc_attr($tab_id) . '" style="display:' . esc_attr($div_display) . '" class="cme-plugin-cap-table">';
 
-						echo '<h3 class="cme-cap-section">' . sprintf(esc_html__( 'Plugin Capabilities &ndash; %s', 'capsman-enhanced' ), esc_html(str_replace('_', ' ', $plugin_title))) . '</h3>';
+						// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+						echo '<h3 class="cme-cap-section">' . sprintf(esc_html__( 'Plugin Capabilities &ndash; %s', 'capability-manager-enhanced' ), $tab_name) . '</h3>';
 
 						echo '<div class="ppc-filter-wrapper">';
-							echo '<input type="text" class="regular-text ppc-filter-text" placeholder="' . esc_attr__('Filter by capability', 'capsman-enhanced') . '">';
-							echo ' <button class="button secondary-button ppc-filter-text-reset" type="button">' . esc_html__('Clear', 'capsman-enhanced') . '</button>';
+							echo '<input type="text" class="regular-text ppc-filter-text" placeholder="' . esc_attr__('Filter by capability', 'capability-manager-enhanced') . '">';
+							echo ' <button class="button secondary-button ppc-filter-text-reset" type="button">' . esc_html__('Clear') . '</button>';
 						echo '</div>';
-						echo '<div class="ppc-filter-no-results" style="display:none;">' . esc_html__( 'No results found. Please try again with a different word.', 'capsman-enhanced' ) . '</div>';
+						echo '<div class="ppc-filter-no-results" style="display:none;">' . esc_html__( 'No results found. Please try again with a different word.', 'capability-manager-enhanced' ) . '</div>';
 
 						echo '<table class="widefat fixed striped form-table cme-checklist single-checkbox-table">';
 
@@ -1191,16 +1456,18 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 
                         ?>
 						<tr class="cme-bulk-select">
-                            <td colspan="<?php echo (int) $checks_per_row;?>">
-                                <input type="checkbox" class="cme-check-all" title="<?php esc_attr_e('check / uncheck all', 'capsman-enhanced');?>"> <span><?php _e('Capability Name', 'capsman-enhanced');?></span>
-								<span style="float:right">
-								&nbsp;&nbsp;<a class="cme-neg-all" href="#" title="<?php esc_attr_e('negate all (storing as disabled capabilities)', 'capsman-enhanced');?>">X</a> <a class="cme-switch-all" href="#" title="<?php esc_attr_e('negate none (add/remove all capabilities normally)', 'capsman-enhanced');?>">X</a>
-								</span>
+                            <td colspan="<?php echo (int) $checks_per_row + 1;?>" style="width: 100%">
+                                <input type="checkbox" class="cme-check-all" title="<?php esc_attr_e('check / uncheck / negate all', 'capability-manager-enhanced');?>"> <span><?php _e('Capability Name', 'capability-manager-enhanced');?></span>
 							</td>
 						</tr>
                         <?php
-						foreach( array_keys($_plugin_caps) as $cap_name ) {
-							$cap_name = sanitize_key($cap_name);
+						$last_cap_group = '';
+						$unique_cap_groups = array_unique(array_values($plugin_cap_group_for_cap));
+						$show_group_headings = count($unique_cap_groups) > 1;
+
+						foreach( $ordered_plugin_caps as $cap_name ) {
+							$cap_name = sanitize_text_field($cap_name);
+							$set_application_password_cap($cap_name);
 
 							if ( isset( $type_caps[$cap_name] ) || in_array($cap_name, $grouped_caps_lists) || isset($type_metacaps[$cap_name]) ) {
 								continue;
@@ -1208,6 +1475,26 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 
 							if ( ! $is_administrator && ! current_user_can($cap_name) )
 								continue;
+
+							$cap_group = isset($plugin_cap_group_for_cap[$cap_name])
+								? $plugin_cap_group_for_cap[$cap_name]
+								: __('General', 'capability-manager-enhanced');
+
+							if ($cap_group !== $last_cap_group) {
+								if ($show_group_headings) {
+									if (!$centinel_ && $i > 0) {
+										for ($i; $i < $checks_per_row; $i++) {
+											echo '<td>&nbsp;</td>';
+										}
+										echo '</tr>';
+										$i = 0;
+										$centinel_ = true;
+									}
+
+									echo '<tr class="cme-cap-group-subheading"><td colspan="' . (int) ($checks_per_row + 1) . '"><h4 class="cme-cap-group-title">' . esc_html($cap_group) . '</h4></td></tr>';
+								}
+								$last_cap_group = $cap_group;
+							}
 
 							// Output first <tr>
 							if ( $centinel_ == true ) {
@@ -1227,30 +1514,50 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 
 							if ( ! empty($pp_metagroup_caps[$cap_name]) ) {
 								$class .= ' cap-metagroup';
-								$title_text = sprintf( __( '%s: assigned by Permission Group', 'capsman-enhanced' ), $cap_name );
+								$tool_tip = sprintf(__( '%s: assigned by Permission Group', 'capability-manager-enhanced' ), '<strong>' . $cap_name . '</strong>' );
 							} else {
-								$title_text = $cap_name;
+								$tool_tip = sprintf(__( 'This capability is %s', 'capability-manager-enhanced' ), '<strong>' . $cap_name . '</strong>' );
 							}
 
                             if ($cap_name === 'manage_capabilities_user_testing') {
-                                $warning_message = '&nbsp; <span class="ppc-tool-tip"><span class="dashicons dashicons-info-outline"></span><span class="tool-tip-text"><p>'. sprintf(esc_html__('The User Testing feature also requires the %1$s edit_users %2$s capability.', 'capsman-enhanced'), '<strong>', '</strong>') .'</p><i></i></span></span>';
+                                $warning_message = '&nbsp; <span class="ppc-tool-tip"><span class="dashicons dashicons-info-outline"></span><span class="tool-tip-text"><p>'. sprintf(esc_html__('The User Testing feature also requires the %1$s edit_users %2$s capability.', 'capability-manager-enhanced'), '<strong>', '</strong>') .'</p><i></i></span></span>';
                             } else {
                                 $warning_message = '';
                             }
 
 							$disabled = '';
-							$checked = checked(1, ! empty($rcaps[$cap_name]), false );
-							$cap_title = $title_text;
+							$checked = !empty($rcaps[$cap_name]) ? 'checked' : '';
+
+							$cap_title = '';
+
+                            $tooltip_html = '
+                                 <div class="tool-tip-text">
+                                    <p>'. $tool_tip .'</p>
+                                    <i></i>
+                                </div>
+                            ';
 							?>
-							<td class="<?php echo esc_attr($class); ?>"><span class="cap-x">X</span><label title="<?php echo esc_attr($cap_title);?>"><input type="checkbox" name="caps[<?php echo esc_attr($cap_name); ?>]" class="pp-single-action-rotate" autocomplete="off" value="1" <?php echo esc_attr($checked) . esc_attr($disabled);?> />
+							<td class="<?php echo esc_attr($class); ?>"><span class="ppc-tool-tip disabled cap-x">X</span><span class="ppc-tool-tip disabled"><label><input type="checkbox" name="caps[<?php echo esc_attr($cap_name); ?>]" class="pp-single-action-rotate" autocomplete="off" value="1" <?php echo esc_attr($checked) . esc_attr($disabled);?> />
 							<span>
 							<?php
 							echo esc_html(str_replace( '_', ' ', $cap_name));
 							?>
-							</span></label><?php echo $warning_message; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><a href="#" class="neg-cap" style="visibility: hidden;">&nbsp;x&nbsp;</a>
+							</span></label>
+								<?php echo $tooltip_html; ?>
+							</span><?php echo $warning_message; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?><a href="#" class="neg-cap" style="visibility: hidden;">&nbsp;x&nbsp;</a>
 							<?php if ( false !== strpos( $class, 'cap-neg' ) ) :?>
 								<input type="hidden" class="cme-negation-input" name="caps[<?php echo esc_attr($cap_name); ?>]" value="" />
 							<?php endif; ?>
+							</td>
+
+							<td class="pp-cap-description">
+							<?php
+							if (!empty($plugin_group_cap_descriptions[$cap_name])) {
+								echo $plugin_group_cap_descriptions[$cap_name];
+							} elseif (!empty($plugin_cap_descriptions[$cap_name])) {
+								echo $plugin_cap_descriptions[$cap_name];
+							}
+							?>
 							</td>
 
 							<?php
@@ -1270,11 +1577,8 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 						?>
 
 						<tr class="cme-bulk-select">
-							<td colspan="<?php echo (int) $checks_per_row;?>">
-								<input type="checkbox" class="cme-check-all" autocomplete="off" title="<?php esc_attr_e('check / uncheck all', 'capsman-enhanced');?>"> <span><?php _e('Capability Name', 'capsman-enhanced');?></span>
-								<span style="float:right">
-								&nbsp;&nbsp;<a class="cme-neg-all" href="#" title="<?php esc_attr_e('negate all (storing as disabled capabilities)', 'capsman-enhanced');?>">X</a> <a class="cme-switch-all" href="#" title="<?php esc_attr_e('negate none (add/remove all capabilities normally)', 'capsman-enhanced');?>">X</a>
-								</span>
+							<td colspan="<?php echo (int) $checks_per_row + 1;?>">
+								<input type="checkbox" class="cme-check-all" autocomplete="off" title="<?php esc_attr_e('check / uncheck / negate all', 'capability-manager-enhanced');?>"> <span><?php _e('Capability Name', 'capability-manager-enhanced');?></span>
 							</td>
 						</tr>
 
@@ -1284,17 +1588,17 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 					}
 
 					// caps: invalid
-					if (array_intersect(array_keys(array_filter($type_metacaps)), $all_capabilities) && array_intersect_key($type_metacaps, array_filter($rcaps))) {
+					if (!$is_application_password && array_intersect(array_keys(array_filter($type_metacaps)), $all_capabilities) && array_intersect_key($type_metacaps, array_filter($rcaps))) {
 						$tab_id = "cme-cap-type-tables-invalid";
 						$div_display = ($tab_id == $active_tab_id) ? 'block' : 'none';
 
 						echo '<div id="' . esc_attr($tab_id) . '" style="display:' . esc_attr($div_display) . '">';
-						echo '<h3 class="cme-cap-section">' . esc_html__( 'Invalid Capabilities', 'capsman-enhanced' ) . '</h3>';
+						echo '<h3 class="cme-cap-section">' . esc_html__( 'Invalid Capabilities', 'capability-manager-enhanced' ) . '</h3>';
 						?>
 
 						<div>
 						<span class="cme-subtext">
-							<?php esc_html_e('The following entries have no effect. Please assign desired capabilities on the Editing / Deletion / Reading tabs.', 'capsman-enhanced');?>
+							<?php esc_html_e('The following entries have no effect. Please assign desired capabilities on the Editing / Deletion / Private tabs.', 'capability-manager-enhanced');?>
 						</span>
 						</div>
 
@@ -1311,7 +1615,8 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 						uasort( $this->capabilities, 'strnatcasecmp' );  // sort by array values, but maintain keys );
 
 						foreach ( $this->capabilities as $cap_name => $cap ) :
-							$cap_name = sanitize_key($cap_name);
+							$cap_name = sanitize_text_field($cap_name);
+							$set_application_password_cap($cap_name);
 
 							if (!isset($type_metacaps[$cap_name]) || empty($rcaps[$cap_name])) {
 								continue;
@@ -1334,18 +1639,30 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 							$title_text = $cap_name;
 
 							$disabled = '';
-							$checked = checked(1, ! empty($rcaps[$cap_name]), false );
+							$checked = !empty($rcaps[$cap_name]) ? 'checked' : '';
                             $invalid_caps_capabilities[] = $cap_name;
+
+							$tool_tip = sprintf(__( 'This capability is %s', 'capability-manager-enhanced' ), '<strong>' . $cap_name . '</strong>' );
+
+                            $tooltip_html = '
+                                 <div class="tool-tip-text">
+                                    <p>'. $tool_tip .'</p>
+                                    <i></i>
+                                </div>
+                            ';
 						?>
-							<td class="<?php echo esc_attr($class); ?>"><span class="cap-x">X</span><label title="<?php echo esc_attr($title_text);?>"><input type="checkbox" name="caps[<?php echo esc_attr($cap_name); ?>]" class="pp-single-action-rotate" autocomplete="off" value="1" <?php echo esc_attr($checked) . esc_attr($disabled);?> />
+							<td class="<?php echo esc_attr($class); ?>"><span class="ppc-tool-tip disabled cap-x">X</span><label title="<?php echo esc_attr($title_text);?>"><input type="checkbox" name="caps[<?php echo esc_attr($cap_name); ?>]" class="pp-single-action-rotate" autocomplete="off" value="1" <?php echo esc_attr($checked) . esc_attr($disabled);?> />
 							<span>
 							<?php
 							echo esc_html(str_replace( '_', ' ', $cap ));
 							?>
+								<?php echo $tooltip_html; ?>
 							</span></label><a href="#" class="neg-cap" style="visibility: hidden;">&nbsp;x&nbsp;</a>
 							<?php if ( false !== strpos( $class, 'cap-neg' ) ) :?>
 								<input type="hidden" class="cme-negation-input" name="caps[<?php echo esc_attr($cap_name); ?>]" value="" />
 							<?php endif; ?>
+							</td>
+							<td>
 							</td>
 						<?php
 							$i++;
@@ -1390,22 +1707,19 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 					<div id="<?php echo esc_attr($tab_id);?>" style="display:<?php echo esc_attr($div_display);?>">
 						<?php
 						// caps: additional
-						echo '<h3 class="cme-cap-section">' . esc_html__( 'Additional Capabilities', 'capsman-enhanced' ) . '</h3>';
+						echo '<h3 class="cme-cap-section">' . esc_html__( 'Additional Capabilities', 'capability-manager-enhanced' ) . '</h3>';
 
 						echo '<div class="ppc-filter-wrapper">';
-							echo '<input type="text" class="regular-text ppc-filter-text" placeholder="' . esc_attr__('Filter by capability', 'capsman-enhanced') . '">';
-							echo ' <button class="button secondary-button ppc-filter-text-reset" type="button">' . esc_html__('Clear', 'capsman-enhanced') . '</button>';
+							echo '<input type="text" class="regular-text ppc-filter-text" placeholder="' . esc_attr__('Filter by capability', 'capability-manager-enhanced') . '">';
+							echo ' <button class="button secondary-button ppc-filter-text-reset" type="button">' . __('Clear') . '</button>';
 						echo '</div>';
-						echo '<div class="ppc-filter-no-results" style="display:none;">' . esc_html__( 'No results found. Please try again with a different word.', 'capsman-enhanced' ) . '</div>';
+						echo '<div class="ppc-filter-no-results" style="display:none;">' . esc_html__( 'No results found. Please try again with a different word.', 'capability-manager-enhanced' ) . '</div>';
 						?>
 						<table class="widefat fixed striped form-table cme-checklist single-checkbox-table">
 
 						<tr class="cme-bulk-select">
                             <td colspan="<?php echo (int) $checks_per_row;?>">
-                                <input type="checkbox" class="cme-check-all" title="<?php esc_attr_e('check / uncheck all', 'capsman-enhanced');?>"> <span><?php _e('Capability Name', 'capsman-enhanced');?></span>
-								<span style="float:right">
-								&nbsp;&nbsp;<a class="cme-neg-all" href="#" title="<?php esc_attr_e('negate all (storing as disabled capabilities)', 'capsman-enhanced');?>">X</a> <a class="cme-switch-all" href="#" title="<?php esc_attr_e('negate none (add/remove all capabilities normally)', 'capsman-enhanced');?>">X</a>
-								</span>
+                                <input type="checkbox" class="cme-check-all" title="<?php esc_attr_e('check / uncheck / negate all', 'capability-manager-enhanced');?>"> <span><?php _e('Capability Name', 'capability-manager-enhanced');?></span>
 							</td>
 						</tr>
 
@@ -1421,9 +1735,26 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 						uasort( $this->capabilities, 'strnatcasecmp' );  // sort by array values, but maintain keys );
 
 						$additional_caps = apply_filters('publishpress_caps_manage_additional_caps', $this->capabilities);
+						$plugin_capability_lookup = pp_capabilities_plugin_capability_lookup($plugin_caps);
+						$additional_tab_slug = 'additional';
+						$additional_group_config = pp_capabilities_capability_tab_group_config(
+							$additional_tab_slug,
+							__('Additional', 'capability-manager-enhanced'),
+							$default,
+							$additional_caps,
+							[
+								$additional_tab_slug => 10,
+							]
+						);
+						$additional_group_enabled = $additional_group_config['enabled'];
+						$additional_group_label = $additional_group_config['label'];
+						$additional_group_size = $additional_group_config['size'];
 
+						$additional_rendered_count = 0;
+						$caps_empty = true;
 						foreach ($additional_caps as $cap_name => $cap) :
-							$cap_name = sanitize_key($cap_name);
+							$cap_name = sanitize_text_field($cap_name);
+							$set_application_password_cap($cap_name);
 
 							if ((isset($type_caps[$cap_name]) && !isset($type_metacaps[$cap_name]))
 							|| in_array($cap_name, $grouped_caps_lists)
@@ -1432,10 +1763,8 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 							}
 
 							if (!isset($type_metacaps[$cap_name]) || !empty($rcaps[$cap_name])) {
-								foreach(array_keys($plugin_caps) as $plugin_title) {
-									if ( in_array( $cap_name, $plugin_caps[$plugin_title]) ) {
-										continue 2;
-									}
+								if (isset($plugin_capability_lookup[$cap_name])) {
+									continue;
 								}
 							}
 
@@ -1446,6 +1775,31 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 							// Levels are not shown.
 							if ( preg_match( '/^level_(10|[0-9])$/i', $cap_name ) ) {
 								continue;
+							}
+
+							if ($additional_group_enabled && (0 === ($additional_rendered_count % $additional_group_size))) {
+								if (!$centinel_ && $i > 0) {
+									for ($i; $i < $checks_per_row; $i++) {
+										echo '<td>&nbsp;</td>';
+									}
+									echo '</tr>';
+									$i = 0;
+									$centinel_ = true;
+								}
+
+								$group_start = $additional_rendered_count + 1;
+								$group_end = $group_start + $additional_group_size - 1;
+								$group_title = pp_capabilities_capability_tab_group_title(
+									$additional_tab_slug,
+									$additional_group_label,
+									$group_start,
+									$group_end,
+									$default,
+									$additional_group_size,
+									$additional_caps
+								);
+
+								echo '<tr class="cme-cap-group-subheading"><td colspan="' . (int) $checks_per_row . '"><h4 class="cme-cap-group-title">' . esc_html($group_title) . '</h4></td></tr>';
 							}
 
 							// Output first <tr>
@@ -1464,15 +1818,18 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 							else
 								$class = ( $rcaps[$cap_name] ) ? 'cap-yes' : 'cap-neg';
 
+							$title_text = '';
+
 							if ( ! empty($pp_metagroup_caps[$cap_name]) ) {
 								$class .= ' cap-metagroup';
-								$title_text = sprintf( esc_html__( '%s: assigned by Permission Group', 'capsman-enhanced' ), $cap_name );
+								$title_text = sprintf( esc_html__( '%s: assigned by Permission Group', 'capability-manager-enhanced' ), '<strong>' . $cap_name . '</strong>' );
+								$tool_tip = sprintf(__( '%s: assigned by Permission Group', 'capability-manager-enhanced' ), '<strong>' . $cap_name . '</strong>' );
 							} else {
-								$title_text = $cap_name;
+								$tool_tip = sprintf(__( 'This capability is %s', 'capability-manager-enhanced' ), '<strong>' . $cap_name . '</strong>' );
 							}
 
 							$disabled = '';
-							$checked = checked(1, ! empty($rcaps[$cap_name]), false );
+							$checked = !empty($rcaps[$cap_name]) ? 'checked' : '';
 
 							if ( 'manage_capabilities' == $cap_name ) {
 								if (!current_user_can('administrator') && (!is_multisite() || !is_super_admin())) {
@@ -1483,19 +1840,33 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 									$disabled = ' disabled ';
 								}
 							}
+
+						$caps_empty = false;
+
+                            $tooltip_html = '
+                                 <div class="tool-tip-text">
+                                    <p>'. $tool_tip .'</p>
+                                    <i></i>
+                                </div>
+                            ';
 						?>
-							<td class="<?php echo esc_attr($class); ?>"><span class="cap-x">X</span><label title="<?php echo esc_attr($title_text);?>"><input type="checkbox" name="caps[<?php echo esc_attr($cap_name); ?>]" class="pp-single-action-rotate" autocomplete="off" value="1" <?php echo esc_attr($checked) . ' ' . esc_attr($disabled);?> />
+							<td class="<?php echo esc_attr($class); ?>"><span class="ppc-tool-tip disabled cap-x">X</span><span class="ppc-tool-tip disabled"><label><input type="checkbox" name="caps[<?php echo esc_attr($cap_name); ?>]" class="pp-single-action-rotate" autocomplete="off" value="1" <?php echo esc_attr($checked) . ' ' . esc_attr($disabled);?> />
 							<span>
 							<?php
 							echo esc_html(str_replace( '_', ' ', $cap ));
 							?>
-							</span></label><a href="#" class="neg-cap" style="visibility: hidden;">&nbsp;x&nbsp;</a>
+								<?php echo $tooltip_html; ?>
+							</span></label><?php if ( ! empty($title_text) ) :?><span class="tool-tip-text" style="text-align: center;">
+								<p><?php echo $title_text; ?></p>
+								<i></i>
+							</span><?php endif;?></span><a href="#" class="neg-cap" style="visibility: hidden;">&nbsp;x&nbsp;</a>
 							<?php if ( false !== strpos( $class, 'cap-neg' ) ) :?>
 								<input type="hidden" class="cme-negation-input" name="caps[<?php echo esc_attr($cap_name); ?>]" value="" />
 							<?php endif; ?>
 							</td>
 						<?php
 							$i++;
+							$additional_rendered_count++;
 						endforeach;
 
 						if ( ! empty($lock_manage_caps_capability) ) {
@@ -1515,18 +1886,186 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 							}
 						}
 						?>
-
+						<?php if ($caps_empty) : ?>
+							<tr>
+								<td colspan="<?php echo (int) $checks_per_row;?>">
+									<div>
+										<?php esc_html_e( 'You have no additional capabilities.', 'capability-manager-enhanced' ); ?>
+									</div>
+								</td>
+							</tr>
+						<?php endif; ?>
 						<tr class="cme-bulk-select">
 							<td colspan="<?php echo (int) $checks_per_row;?>">
-								<input type="checkbox" class="cme-check-all" autocomplete="off" title="<?php esc_attr_e('check / uncheck all', 'capsman-enhanced');?>"> <span><?php _e('Capability Name', 'capsman-enhanced');?></span>
-								<span style="float:right">
-								&nbsp;&nbsp;<a class="cme-neg-all" href="#" title="<?php esc_attr_e('negate all (storing as disabled capabilities)', 'capsman-enhanced');?>">X</a> <a class="cme-switch-all" href="#" title="<?php esc_attr_e('negate none (add/remove all capabilities normally)', 'capsman-enhanced');?>">X</a>
-								</span>
+								<input type="checkbox" class="cme-check-all" autocomplete="off" title="<?php esc_attr_e('check / uncheck / negate all', 'capability-manager-enhanced');?>"> <span><?php _e('Capability Name', 'capability-manager-enhanced');?></span>
 							</td>
 						</tr>
 
 						</table>
 					</div>
+
+					<div class="capabilities-sidebar pp-column-right">
+						<?php
+						do_action('publishpress-caps_sidebar_top');
+
+						$banners = new PublishPress\WordPressBanners\BannersMain;
+
+						$banner_messages = [];
+						$banner_messages[] = esc_html__('Capabilities allows you change the permissions for any user role.', 'capability-manager-enhanced');
+						$banner_messages[] = sprintf(esc_html__('%1$s = Capability granted %2$s', 'capability-manager-enhanced'), '<table class="pp-capabilities-cb-key"><tr><td class="pp-cap-icon pp-cap-icon-checked"><input type="checkbox" title="'. esc_attr__('usage key', 'capability-manager-enhanced') .'" checked disabled></td><td>', '</td></tr>');
+						$banner_messages[] = sprintf(esc_html__('%1$s = Capability not granted %2$s', 'capability-manager-enhanced'), '<tr><td class="pp-cap-icon"><input type="checkbox" title="'. esc_attr__('usage key', 'capability-manager-enhanced') .'" disabled></td><td class="pp-cap-not-checked-definition">', '</td></tr>');
+						$banner_messages[] = sprintf(esc_html__('%1$s = Capability denied, even if granted by another role %2$s', 'capability-manager-enhanced'), '<tr><td class="pp-cap-icon pp-cap-x"><span class="cap-x pp-cap-key" title="'. esc_attr__('usage key', 'capability-manager-enhanced') .'">X</span></td><td class="cap-x-definition">', '</td></tr></table>');
+						if (!$is_application_password && defined('PRESSPERMIT_ACTIVE') && function_exists('presspermit')) {
+							if ($group = presspermit()->groups()->getMetagroup('wp_role', $this->current)) {
+								$additional_message = sprintf(
+									// back compat with existing language string
+									str_replace(
+										['&lt;strong&gt;', '&lt;/strong&gt;'],
+										['<strong>', '</strong>'],
+										esc_html__('You can also configure this role as a %sPermission Group%s.', 'capability-manager-enhanced')
+									),
+									'<a href="' . esc_url_raw(admin_url("admin.php?page=presspermit-edit-permissions&action=edit&agent_id={$group->ID}")) . '">',
+									'</a>'
+								);
+								$banner_messages[] = '<p class="cme-subtext">' . $additional_message . '</p>';
+							}
+						}
+
+						?>
+						<div class="ppc-sidebar-panel-metabox meta-box-sortables">
+							<?php $meta_box_state = (isset($sidebar_metabox_state['how_to_user_capabilities'])) ? $sidebar_metabox_state['how_to_user_capabilities'] : 'closed';  ?>
+							<div class="postbox ppc-sidebar-panel <?php echo esc_attr($meta_box_state); ?>">
+								<input
+									name="ppc_metabox_state[how_to_user_capabilities]"
+									type="hidden"
+									class="metabox-state"
+									value="<?php echo esc_attr($meta_box_state); ?>"
+								/>
+								<div class="postbox-header">
+									<h2 class="hndle ui-sortable-handle"><?php esc_html_e('How to use Capabilities', 'capability-manager-enhanced'); ?></h2>
+									<div class="handle-actions">
+										<button type="button" class="handlediv">
+											<span class="toggle-indicator"></span>
+										</button>
+									</div>
+								</div>
+								<div class="inside">
+								<?php
+									$banners->pp_display_banner(
+										'',
+										'',
+										$banner_messages,
+										'https://publishpress.com/knowledge-base/capabilities-screen/',
+										__('View Documentation', 'capability-manager-enhanced'),
+										'',
+										'button ppc-checkboxes-documentation-link'
+									);
+									?>
+								</div>
+							</div>
+						</div>
+
+						<?php
+						$pp_ui->pp_types_ui( $defined['type'] );
+						$pp_ui->pp_taxonomies_ui( $defined['taxonomy'] );
+						?>
+
+						<div class="ppc-sidebar-panel-metabox meta-box-sortables ppc-safe">
+							<?php $meta_box_state = (isset($sidebar_metabox_state['capabilities_safe_to_use'])) ? $sidebar_metabox_state['capabilities_safe_to_use'] : 'closed';  ?>
+							<div class="postbox ppc-sidebar-panel <?php echo esc_attr($meta_box_state); ?>">
+								<input
+									name="ppc_metabox_state[capabilities_safe_to_use]"
+									type="hidden"
+									class="metabox-state"
+									value="<?php echo esc_attr($meta_box_state); ?>"
+								/>
+								<div class="postbox-header">
+									<h2 class="hndle ui-sortable-handle"><?php esc_html_e( 'Capabilities is Safe to Use', 'capability-manager-enhanced' ); ?></h2>
+									<div class="handle-actions">
+										<button type="button" class="handlediv">
+											<span class="toggle-indicator"></span>
+										</button>
+									</div>
+								</div>
+								<div class="inside">
+								<?php
+										$banners->pp_display_banner(
+											'',
+											'',
+											array(
+												__( 'WordPress stores role capabilities in your database, where they remain even if the plugin is deactivated.', 'capability-manager-enhanced' ),
+												__( 'Whenever you use PublishPress Capabilities to save changes, it also creates a backup which you can use to restore a previous configuration.', 'capability-manager-enhanced' )
+											),
+											admin_url( 'admin.php?page=pp-capabilities-backup' ),
+											__( 'Go to the Backup feature', 'capability-manager-enhanced' ),
+											'',
+											'button'
+										);
+									?>
+								</div>
+							</div>
+						</div>
+
+						<?php if (!$is_application_password) : ?>
+						<div class="ppc-sidebar-panel-metabox meta-box-sortables ppc-add-cap">
+							<?php $meta_box_state = (isset($sidebar_metabox_state['add_capability'])) ? $sidebar_metabox_state['add_capability'] : 'closed';  ?>
+							<div class="postbox ppc-sidebar-panel <?php echo esc_attr($meta_box_state); ?>">
+								<input
+									name="ppc_metabox_state[add_capability]"
+									type="hidden"
+									class="metabox-state"
+									value="<?php echo esc_attr($meta_box_state); ?>"
+								/>
+								<div class="postbox-header">
+									<h2 class="hndle ui-sortable-handle"><?php esc_html_e('Add a New Capability', 'capability-manager-enhanced'); ?></h2>
+									<div class="handle-actions">
+										<button type="button" class="handlediv">
+											<span class="toggle-indicator"></span>
+										</button>
+									</div>
+								</div>
+								<div class="inside" style="text-align:center;">
+									<p>
+										<input type="text" name="capability-name" class="regular-text" placeholder="<?php echo 'capability_name';?>" /><br />
+										<input type="submit" name="AddCap" value="<?php esc_attr_e('Add to role', 'capability-manager-enhanced') ?>" class="button" />
+									</p>
+									<br />
+									<div class="cme-subtext"><?php _e('New capabilities are controlled on the Additonal tab.', 'capability-manager-enhanced');?></div>
+								</div>
+							</div>
+						</div>
+						<?php endif; ?>
+
+						<?php if (!$is_application_password && is_multisite() && is_super_admin() && is_main_site()) : ?>
+							<div class="ppc-sidebar-panel-metabox meta-box-sortables ppc-multi-site">
+								<?php $meta_box_state = (isset($sidebar_metabox_state['multi_site'])) ? $sidebar_metabox_state['multi_site'] : 'closed';  ?>
+								<div class="postbox ppc-sidebar-panel <?php echo esc_attr($meta_box_state); ?>">
+									<input
+										name="ppc_metabox_state[multi_site]"
+										type="hidden"
+										class="metabox-state"
+										value="<?php echo esc_attr($meta_box_state); ?>"
+									/>
+									<div class="postbox-header">
+										<h2 class="hndle ui-sortable-handle"><?php esc_html_e('Multisite', 'capability-manager-enhanced'); ?></h2>
+										<div class="handle-actions">
+											<button type="button" class="handlediv">
+												<span class="toggle-indicator"></span>
+											</button>
+										</div>
+									</div>
+									<div class="inside">
+										<?php cme_network_role_ui( $default ); ?>
+									</div>
+								</div>
+							</div>
+						<?php endif; ?>
+
+						<?php
+							do_action('publishpress-caps_sidebar_bottom');
+						?>
+
+					</div><!-- right sidebar within tab panel -->
 				</div>
 			</div>
 
@@ -1548,66 +2087,66 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 
 			<?php /* play.png icon by Pavel: http://kde-look.org/usermanager/search.php?username=InFeRnODeMoN */ ?>
 
-			<div id="pp_features" style="display:none"><div class="pp-logo"><a href="https://publishpress.com/presspermit/"><img src="<?php echo esc_url_raw($img_url);?>pp-logo.png" alt="<?php esc_attr_e('PublishPress Permissions', 'capsman-enhanced');?>" /></a></div><div class="features-wrap"><ul class="pp-features">
+			<div id="pp_features" style="display:none"><div class="pp-logo"><a href="https://publishpress.com/presspermit/"><img src="<?php echo esc_url_raw($img_url);?>pp-logo.png" alt="<?php esc_attr_e('PublishPress Permissions', 'capability-manager-enhanced');?>" /></a></div><div class="features-wrap"><ul class="pp-features">
 			<li>
-			<?php esc_html_e( "Automatically define type-specific capabilities for your custom post types and taxonomies", 'capsman-enhanced' );?>
+			<?php esc_html_e( "Automatically define type-specific capabilities for your custom post types and taxonomies", 'capability-manager-enhanced' );?>
 			<a href="https://presspermit.com/tutorial/regulate-post-type-access" target="_blank"><img class="cme-play" alt="*" src="<?php echo esc_url_raw($img_url);?>play.png" /></a></li>
 
 			<li>
-			<?php esc_html_e( "Assign standard WP roles supplementally for a specific post type", 'capsman-enhanced' );?>
+			<?php esc_html_e( "Assign standard WP roles supplementally for a specific post type", 'capability-manager-enhanced' );?>
 			<a href="https://presspermit.com/tutorial/regulate-post-type-access" target="_blank"><img class="cme-play" alt="*" src="<?php echo esc_url_raw($img_url);?>play.png" /></a></li>
 
 			<li>
-			<?php esc_html_e( "Assign custom WP roles supplementally for a specific post type <em>(Pro)</em>", 'capsman-enhanced' );?>
+			<?php esc_html_e( "Assign custom WP roles supplementally for a specific post type <em>(Pro)</em>", 'capability-manager-enhanced' );?>
 			</li>
 
 			<li>
-			<?php esc_html_e( "Customize reading permissions per-category or per-post", 'capsman-enhanced' );?>
+			<?php esc_html_e( "Customize reading permissions per-category or per-post", 'capability-manager-enhanced' );?>
 			<a href="https://presspermit.com/tutorial/category-exceptions" target="_blank"><img class="cme-play" alt="*" src="<?php echo esc_url_raw($img_url);?>play.png" /></a></li>
 
 			<li>
-			<?php esc_html_e( "Customize editing permissions per-category or per-post <em>(Pro)</em>", 'capsman-enhanced' );?>
+			<?php esc_html_e( "Customize editing permissions per-category or per-post <em>(Pro)</em>", 'capability-manager-enhanced' );?>
 			<a href="https://presspermit.com/tutorial/page-editing-exceptions" target="_blank"><img class="cme-play" alt="*" src="<?php echo esc_url_raw($img_url);?>play.png" /></a></li>
 
 			<li>
-			<?php esc_html_e( "Custom Post Visibility statuses, fully implemented throughout wp-admin <em>(Pro)</em>", 'capsman-enhanced' );?>
+			<?php esc_html_e( "Custom Post Visibility statuses, fully implemented throughout wp-admin <em>(Pro)</em>", 'capability-manager-enhanced' );?>
 			<a href="https://presspermit.com/tutorial/custom-post-visibility" target="_blank"><img class="cme-play" alt="*" src="<?php echo esc_url_raw($img_url);?>play.png" /></a></li>
 
 			<li>
-			<?php esc_html_e( "Custom Moderation statuses for access-controlled, multi-step publishing workflow <em>(Pro)</em>", 'capsman-enhanced' );?>
+			<?php esc_html_e( "Custom Moderation statuses for access-controlled, multi-step publishing workflow <em>(Pro)</em>", 'capability-manager-enhanced' );?>
 			<a href="https://presspermit.com/tutorial/multi-step-moderation" target="_blank"><img class="cme-play" alt="*" src="<?php echo esc_url_raw($img_url);?>play.png" /></a></li>
 
 			<li>
-			<?php esc_html_e( "Regulate permissions for Edit Flow post statuses <em>(Pro)</em>", 'capsman-enhanced' );?>
+			<?php esc_html_e( "Regulate permissions for Edit Flow post statuses <em>(Pro)</em>", 'capability-manager-enhanced' );?>
 			<a href="https://presspermit.com/tutorial/edit-flow-integration" target="_blank"><img class="cme-play" alt="*" src="<?php echo esc_url_raw($img_url);?>play.png" /></a></li>
 
 			<li>
-			<?php esc_html_e( "Customize the moderated editing of published content with Revisionary or Post Forking <em>(Pro)</em>", 'capsman-enhanced' );?>
+			<?php esc_html_e( "Customize the moderated editing of published content with Revisionary or Post Forking <em>(Pro)</em>", 'capability-manager-enhanced' );?>
 			<a href="https://presspermit.com/tutorial/published-content-revision" target="_blank"><img class="cme-play" alt="*" src="<?php echo esc_url_raw($img_url);?>play.png" /></a></li>
 
 			<li>
-			<?php esc_html_e( "Grant Spectator, Participant or Moderator access to specific bbPress forums <em>(Pro)</em>", 'capsman-enhanced' );?>
+			<?php esc_html_e( "Grant Spectator, Participant or Moderator access to specific bbPress forums <em>(Pro)</em>", 'capability-manager-enhanced' );?>
 			</li>
 
 			<li>
-			<?php esc_html_e( "Grant supplemental content permissions to a BuddyPress group <em>(Pro)</em>", 'capsman-enhanced' );?>
+			<?php esc_html_e( "Grant supplemental content permissions to a BuddyPress group <em>(Pro)</em>", 'capability-manager-enhanced' );?>
 			<a href="https://presspermit.com/tutorial/buddypress-content-permissions" target="_blank"><img class="cme-play" alt="*" src="<?php echo esc_url_raw($img_url);?>play.png" /></a></li>
 
 			<li>
-			<?php esc_html_e( "WPML integration to mirror permissions to translations <em>(Pro)</em>", 'capsman-enhanced' );?>
+			<?php esc_html_e( "WPML integration to mirror permissions to translations <em>(Pro)</em>", 'capability-manager-enhanced' );?>
 			</li>
 
 			<li>
-			<?php esc_html_e( "Member support forum", 'capsman-enhanced' );?>
+			<?php esc_html_e( "Member support forum", 'capability-manager-enhanced' );?>
 			</li>
 
 			</ul></div>
 
 			<?php
 			echo '<div>';
-			printf( esc_html__('%1$sgrab%2$s %3$s', 'capsman-enhanced'), '<strong>', '</strong>', '<span class="plugins update-message"><a href="' . esc_url_raw(cme_plugin_info_url('press-permit-core')) . '" class="thickbox" title="' . sprintf( esc_attr__('%s (free install)', 'capsman-enhanced'), 'Permissions Pro' ) . '">Permissions Pro</a></span>' );
+			printf( esc_html__('%1$sgrab%2$s %3$s', 'capability-manager-enhanced'), '<strong>', '</strong>', '<span class="plugins update-message"><a href="' . esc_url_raw(cme_plugin_info_url('press-permit-core')) . '" class="thickbox" title="' . sprintf( esc_attr__('%s (free install)', 'capability-manager-enhanced'), 'Permissions Pro' ) . '">Permissions Pro</a></span>' );
 			echo '&nbsp;&nbsp;&bull;&nbsp;&nbsp;';
-			printf( esc_html__('%1$sbuy%2$s %3$s', 'capsman-enhanced'), '<strong>', '</strong>',  '<a href="https://publishpress.com/presspermit/" target="_blank" title="' . sprintf( esc_attr__('%s info/purchase', 'capsman-enhanced'), 'Permissions Pro' ) . '">Permissions&nbsp;Pro</a>' );
+			printf( esc_html__('%1$sbuy%2$s %3$s', 'capability-manager-enhanced'), '<strong>', '</strong>',  '<a href="https://publishpress.com/presspermit/" target="_blank" title="' . sprintf( esc_attr__('%s info/purchase', 'capability-manager-enhanced'), 'Permissions Pro' ) . '">Permissions&nbsp;Pro</a>' );
 			echo '&nbsp;&nbsp;&bull;&nbsp;&nbsp;';
 			echo '<a href="#pp-hide">hide</a>';
 			echo '</div></div>';
@@ -1635,13 +2174,14 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 			/* ]]> */
 			</script>
 
+			<?php if (!$is_application_password) : ?>
 			<div style="display:none; float:right;">
 			<?php
 			$level = ak_caps2level($rcaps);
 			?>
-			<span title="<?php esc_attr_e('Role level is mostly deprecated. However, it still determines eligibility for Post Author assignment and limits the application of user editing capabilities.', 'capsman-enhanced');?>">
+			<span title="<?php esc_attr_e('Role level is mostly deprecated. However, it still determines eligibility for Post Author assignment and limits the application of user editing capabilities.', 'capability-manager-enhanced');?>">
 
-			<?php (in_array(get_locale(), ['en_EN', 'en_US'])) ? printf('Role Level:') : esc_html_e('Level:', 'capsman-enhanced');?> <select name="level">
+			<?php (in_array(get_locale(), ['en_EN', 'en_US'])) ? printf('Role Level:') : esc_html_e('Level:', 'capability-manager-enhanced');?> <select name="level">
 			<?php for ( $l = $this->max_level; $l >= 0; $l-- ) {?>
 					<option value="<?php echo (int) $l; ?>" style="text-align:right;"<?php selected($level, $l); ?>>&nbsp;<?php echo (int) $l; ?>&nbsp;</option>
 				<?php }
@@ -1650,154 +2190,19 @@ if (defined('PUBLISHPRESS_REVISIONS_VERSION') && function_exists('rvy_get_option
 			</span>
 
 			</div>
-
-		<?php
-		$support_pp_only_roles = defined('PRESSPERMIT_ACTIVE');
-		cme_network_role_ui( $default );
-		?>
+			<?php endif; ?>
 
 		<p class="submit" style="padding-top:0;">
 			<input type="hidden" name="action" value="update" />
 			<input type="hidden" name="current" value="<?php echo esc_attr($default); ?>" />
 
 			<?php
-			$save_caption = (in_array(sanitize_key(get_locale()), ['en_EN', 'en_US'])) ? 'Save Capabilities' : __('Save Changes', 'capsman-enhanced');
+			$save_caption = (in_array(sanitize_key(get_locale()), ['en_EN', 'en_US'])) ? 'Save Capabilities' : esc_html__('Save Changes');
 			?>
-			<input type="submit" name="SaveRole" value="<?php echo esc_attr($save_caption);?>" class="button-primary" /> &nbsp;
+			<input type="submit" name="SaveRole" value="<?php echo esc_attr($save_caption);?>" class="button-primary" style="float: right;" /> &nbsp;
 		</p>
 
 		</div><!-- .pp-column-left -->
-		<div class="pp-column-right capabilities-sidebar">
-			<?php
-			do_action('publishpress-caps_sidebar_top');
-
-			$banners = new PublishPress\WordPressBanners\BannersMain;
-            
-            $banner_messages = [];
-            $banner_messages[] = esc_html__('Capabilities allows you change the permissions for any user role.', 'capsman-enhanced');
-            $banner_messages[] = sprintf(esc_html__('%1$s = Capability granted %2$s', 'capsman-enhanced'), '<table class="pp-capabilities-cb-key"><tr><td class="pp-cap-icon pp-cap-icon-checked"><input type="checkbox" title="'. esc_attr__('usage key', 'capsman-enhanced') .'" checked disabled></td><td>', '</td></tr>');
-            $banner_messages[] = sprintf(esc_html__('%1$s = Capability not granted %2$s', 'capsman-enhanced'), '<tr><td class="pp-cap-icon"><input type="checkbox" title="'. esc_attr__('usage key', 'capsman-enhanced') .'" disabled></td><td class="pp-cap-not-checked-definition">', '</td></tr>');
-            $banner_messages[] = sprintf(esc_html__('%1$s = Capability denied, even if granted by another role %2$s', 'capsman-enhanced'), '<tr><td class="pp-cap-icon pp-cap-x"><span class="cap-x pp-cap-key" title="'. esc_attr__('usage key', 'capsman-enhanced') .'">X</span></td><td class="cap-x-definition">', '</td></tr></table>');
-            if (defined('PRESSPERMIT_ACTIVE') && function_exists('presspermit')) {
-                if ($group = presspermit()->groups()->getMetagroup('wp_role', $this->current)) {
-                    $additional_message = sprintf(
-                        // back compat with existing language string
-                        str_replace(
-                            ['&lt;strong&gt;', '&lt;/strong&gt;'],
-                            ['<strong>', '</strong>'],
-                            esc_html__('You can also configure this role as a %sPermission Group%s.', 'capsman-enhanced')
-                        ),
-                        '<a href="' . esc_url_raw(admin_url("admin.php?page=presspermit-edit-permissions&action=edit&agent_id={$group->ID}")) . '">',
-                        '</a>'
-                    );
-                    $banner_messages[] = '<p class="cme-subtext">' . $additional_message . '</p>';
-                }
-            }
-
-            ?>
-            <div class="ppc-sidebar-panel-metabox meta-box-sortables">
-                <?php $meta_box_state = (isset($sidebar_metabox_state['how_to_user_capabilities'])) ? $sidebar_metabox_state['how_to_user_capabilities'] : 'closed';  ?>
-                <div class="postbox ppc-sidebar-panel <?php echo esc_attr($meta_box_state); ?>">
-                    <input 
-                        name="ppc_metabox_state[how_to_user_capabilities]"
-                        type="hidden" 
-                        class="metabox-state" 
-                        value="<?php echo esc_attr($meta_box_state); ?>"
-                    />
-                    <div class="postbox-header">
-                        <h2 class="hndle ui-sortable-handle"><?php esc_html_e('How to use Capabilities', 'capsman-enhanced'); ?></h2>
-                        <div class="handle-actions">
-                            <button type="button" class="handlediv">
-                                <span class="toggle-indicator"></span>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="inside">
-                    <?php 
-                        $banners->pp_display_banner(
-                            '',
-                            '',
-                            $banner_messages,
-                            'https://publishpress.com/knowledge-base/capabilities-screen/',
-                            __('View Documentation', 'capsman-enhanced'),
-                            '',
-                            'button ppc-checkboxes-documentation-link'
-                        );
-                        ?>
-                    </div>
-                </div>
-            </div>
-
-            <div class="ppc-sidebar-panel-metabox meta-box-sortables">
-                <?php $meta_box_state = (isset($sidebar_metabox_state['capabilities_safe_to_use'])) ? $sidebar_metabox_state['capabilities_safe_to_use'] : 'closed';  ?>
-                <div class="postbox ppc-sidebar-panel <?php echo esc_attr($meta_box_state); ?>">
-                    <input 
-                        name="ppc_metabox_state[capabilities_safe_to_use]"
-                        type="hidden" 
-                        class="metabox-state" 
-                        value="<?php echo esc_attr($meta_box_state); ?>"
-                    />
-                    <div class="postbox-header">
-                        <h2 class="hndle ui-sortable-handle"><?php esc_html_e( 'Capabilities is Safe to Use', 'capsman-enhanced' ); ?></h2>
-                        <div class="handle-actions">
-                            <button type="button" class="handlediv">
-                                <span class="toggle-indicator"></span>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="inside">
-                     <?php
-                            $banners->pp_display_banner(
-                                '',
-                                '',
-                                array(
-                                    __( 'WordPress stores role capabilities in your database, where they remain even if the plugin is deactivated.', 'capsman-enhanced' ),
-                                    __( 'Whenever you use PublishPress Capabilities to save changes, it also creates a backup which you can use to restore a previous configuration.', 'capsman-enhanced' )
-                                ),
-                                admin_url( 'admin.php?page=pp-capabilities-backup' ),
-                                __( 'Go to the Backup feature', 'capsman-enhanced' ),
-                                '',
-                                'button'
-                            );
-                        ?>
-                    </div>
-                </div>
-            </div>
-
-            <div class="ppc-sidebar-panel-metabox meta-box-sortables">
-                <?php $meta_box_state = (isset($sidebar_metabox_state['add_capability'])) ? $sidebar_metabox_state['add_capability'] : 'closed';  ?>
-                <div class="postbox ppc-sidebar-panel <?php echo esc_attr($meta_box_state); ?>">
-                    <input 
-                        name="ppc_metabox_state[add_capability]"
-                        type="hidden" 
-                        class="metabox-state" 
-                        value="<?php echo esc_attr($meta_box_state); ?>"
-                    />
-                    <div class="postbox-header">
-                        <h2 class="hndle ui-sortable-handle"><?php esc_html_e('Add a New Capability', 'capsman-enhanced'); ?></h2>
-                        <div class="handle-actions">
-                            <button type="button" class="handlediv">
-                                <span class="toggle-indicator"></span>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="inside" style="text-align:center;">
-                        <p>
-                            <input type="text" name="capability-name" class="regular-text" placeholder="<?php echo 'capability_name';?>" /><br />
-                            <input type="submit" name="AddCap" value="<?php esc_attr_e('Add to role', 'capsman-enhanced') ?>" class="button" />
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-			<?php
-				$pp_ui->pp_types_ui( $defined['type'] );
-				$pp_ui->pp_taxonomies_ui( $defined['taxonomy'] );
-
-				do_action('publishpress-caps_sidebar_bottom');
-			?>
-
-		</div><!-- .pp-column-right -->
 	</div><!-- .pp-columns-wrapper -->
 	</td></tr></table> <!-- .akmin -->
 	</fieldset>
@@ -1815,22 +2220,19 @@ function cme_network_role_ui( $default ) {
 		return false;
 	}
 	?>
-
-	<div style="float:right;margin-left:10px;margin-right:10px">
 		<?php
 		if ( ! $autocreate_roles = get_site_option( 'cme_autocreate_roles' ) )
 			$autocreate_roles = array();
 		?>
 		<div style="margin-bottom: 5px">
-		<label for="cme_autocreate_role" title="<?php esc_attr_e('Create this role definition in new (future) sites', 'capsman-enhanced');?>"><input type="checkbox" name="cme_autocreate_role" id="cme_autocreate_role" autocomplete="off" value="1" <?php echo checked(in_array($default, $autocreate_roles));?>> <?php esc_html_e('include in new sites', 'capsman-enhanced'); ?> </label>
+		<label for="cme_autocreate_role" title="<?php esc_attr_e('Create this role definition in new (future) sites', 'capability-manager-enhanced');?>"><input type="checkbox" name="cme_autocreate_role" id="cme_autocreate_role" autocomplete="off" value="1" <?php echo checked(in_array($default, $autocreate_roles));?>> <?php esc_html_e('Include in new sites.', 'capability-manager-enhanced'); ?> </label>
 		</div>
 		<div>
-		<label for="cme_net_sync_role" title="<?php echo esc_attr__('Copy / update this role definition to all sites now', 'capsman-enhanced');?>"><input type="checkbox" name="cme_net_sync_role" id="cme_net_sync_role" autocomplete="off" value="1"> <?php esc_html_e('sync role to all sites now', 'capsman-enhanced'); ?> </label>
+		<label for="cme_net_sync_role" title="<?php echo esc_attr__('Copy / update this role definition to all sites now', 'capability-manager-enhanced');?>"><input type="checkbox" name="cme_net_sync_role" id="cme_net_sync_role" autocomplete="off" value="1"> <?php esc_html_e('Sync role to all sites.', 'capability-manager-enhanced'); ?> </label>
 		</div>
 		<div>
-		<label for="cme_net_sync_options" title="<?php echo esc_attr__('Copy option settings to all sites now', 'capsman-enhanced');?>"><input type="checkbox" name="cme_net_sync_options" id="cme_net_sync_options" autocomplete="off" value="1"> <?php esc_html_e('sync options to all sites now', 'capsman-enhanced'); ?> </label>
+		<label for="cme_net_sync_options" title="<?php echo esc_attr__('Copy option settings to all sites now', 'capability-manager-enhanced');?>"><input type="checkbox" name="cme_net_sync_options" id="cme_net_sync_options" autocomplete="off" value="1"> <?php esc_html_e('Sync options to all sites.', 'capability-manager-enhanced'); ?> </label>
 		</div>
-	</div>
 <?php
 	return true;
 }

@@ -40,22 +40,27 @@ class SiteOrigin_Widget_Field_Presets extends SiteOrigin_Widget_Field_Base {
 			<?php if ( ! empty( $this->default_preset ) ) { ?>
 				data-default-preset="<?php echo esc_attr( $this->default_preset ); ?>"
 			<?php } ?>
-		>
+			>
 
-			<option value="default"></option>
-			<?php if ( ! empty( $preset_options ) ) { ?>
-				<?php foreach ( $preset_options as $key => $val ) { ?>
-					<?php
+			<?php if ( empty( $this->default_preset ) ) { ?>
+				<option value="default"></option>
+				<?php
+			}
+			if ( ! empty( $preset_options ) ) {
+				foreach ( $preset_options as $key => $val ) {
 					if ( is_array( $value ) ) {
 						$selected = selected( true, in_array( $key, $value ), false );
 					} else {
 						$selected = selected( $key, $value, false );
-					} ?>
+					}
+					?>
 					<option value="<?php echo esc_attr( $key ); ?>" <?php echo $selected; ?>><?php echo esc_html( $val ); ?></option>
 				<?php } ?>
 			<?php } ?>
 		</select>
-		<a href="#" class="sowb-presets-field-undo"><?php _e( 'Undo', 'so-widgets-bundle' ); ?></a>
+		<a href="#" class="sowb-presets-field-undo">
+			<?php echo esc_html__( 'Undo', 'so-widgets-bundle' ); ?>
+		</a>
 		<?php
 	}
 

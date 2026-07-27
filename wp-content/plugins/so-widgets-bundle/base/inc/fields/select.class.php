@@ -33,34 +33,49 @@ class SiteOrigin_Widget_Field_Select extends SiteOrigin_Widget_Field_Base {
 	protected $select2;
 
 	public function enqueue_scripts() {
+		if ( empty( $this->select2 ) ) {
+			return;
+		}
+
+		wp_enqueue_script( 'select2' );
+		wp_enqueue_script(
+			'so-select-field',
+			plugin_dir_url( __FILE__ ) . 'js/select-field' . SOW_BUNDLE_JS_SUFFIX . '.js',
+			array( 'jquery' ),
+			SOW_BUNDLE_VERSION
+		);
+
+		wp_enqueue_style(
+			'so-select-field',
+			plugin_dir_url( __FILE__ ) . 'css/select-field.css',
+			array(),
+			SOW_BUNDLE_VERSION
+		);
+	}
+
+	 /**
+	 * Get the field name for the select element.
+	 *
+	 * This method returns the field name for the select element. If the
+	 * select element supports multiple selections and the current context is
+	 * not from Page Builder, '[]' is appended to the field name to indicate
+	 * that it is an array. Otherwise, the field name is returned as is.
+	 *
+	 * @return string The field name for the select element.
+	 */
+	private function get_select_field_name() {
 		if (
 			! empty( $this->multiple ) &&
-			! empty( $this->select2 )
+			filter_input( INPUT_POST, 'action' ) !== 'so_panels_widget_form'
 		) {
-			wp_enqueue_script( 'select2' );
-			wp_enqueue_style( 'select2' );
-			wp_enqueue_script(
-				'so-select-field',
-				plugin_dir_url( __FILE__ ) . 'js/select-field' . SOW_BUNDLE_JS_SUFFIX . '.js',
-				array( 'jquery' ),
-				SOW_BUNDLE_VERSION
-			);
-
-			wp_enqueue_style(
-				'so-select-field',
-				plugin_dir_url( __FILE__ ) . 'css/select-field.css',
-				array(),
-				SOW_BUNDLE_VERSION
-			);
+			return $this->element_name . '[]';
 		}
+
+		return $this->element_name;
 	}
 
 	protected function render_field( $value, $instance ) {
-
-		if (
-			! empty( $this->multiple ) &&
-			! empty( $this->select2 )
-		) {
+		if ( ! empty( $this->select2 ) ) {
 			if ( ! empty( $this->input_css_classes ) ) {
 				$this->input_css_classes = array();
 			}
@@ -68,7 +83,7 @@ class SiteOrigin_Widget_Field_Select extends SiteOrigin_Widget_Field_Base {
 		}
 		?>
 		<select
-			name="<?php echo esc_attr( $this->element_name ); ?>"
+			name="<?php echo esc_attr( $this->get_select_field_name() ); ?>"
 			id="<?php echo esc_attr( $this->element_id ); ?>"
 			class="siteorigin-widget-input siteorigin-widget-input-select<?php if ( ! empty( $this->input_css_classes ) ) {
 					echo ' ' . implode( ' ', $this->input_css_classes );
@@ -96,7 +111,37 @@ class SiteOrigin_Widget_Field_Select extends SiteOrigin_Widget_Field_Base {
 	}
 
 	protected function sanitize_field_input( $value, $instance ) {
+		// When the options registry didn't populate this request, every stored
+		// value would fail the in_array() check below and get reset to default,
+		// corrupting good stored data.
+		if ( empty( $this->options ) ) {
+			// Can't validate against the registry this request. Only pass
+			// through unchanged when the new value is CONFIRMED equal to
+			// what's already stored ($this->old_value) — an untouched
+			// re-save, where skipping sanitization avoids re-running
+			// sanitizers on their own stored output. Any other case —
+			// including a genuinely changed value, or the old value not
+			// being reliably known at all (e.g. this field is nested inside
+			// a container, where $this->old_value is always null) — falls
+			// through to the neutral sanitize_text_field() floor below.
+			// Treating "unknown" the same as "unchanged" would reopen the
+			// unsanitized-pass-through bypass this branch exists to close.
+			// sanitize_text_field() (not sanitize_key()) is required here:
+			// real stored option keys in this codebase include
+			// dotted-decimal strings (e.g. '0.5', '1.33' in
+			// widgets/social-media-buttons/social-media-buttons.php) that
+			// sanitize_key() would corrupt by stripping the '.'.
+			if ( $value === $this->old_value ) {
+				return $value;
+			}
+
+			return is_array( $value )
+				? array_map( 'sanitize_text_field', $value )
+				: sanitize_text_field( $value );
+		}
+
 		$values = is_array( $value ) ? $value : array( $value );
+
 		$keys = array_keys( $this->options );
 		$sanitized_value = array();
 

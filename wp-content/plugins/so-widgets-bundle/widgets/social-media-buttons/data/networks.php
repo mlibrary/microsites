@@ -23,7 +23,7 @@ return array(
 		'label' => __( 'Email', 'so-widgets-bundle' ),
 		'base_url' => 'mailto:',
 		'icon_color' => '#ffffff',
-		'button_color' => '#99c4e6',
+		'button_color' => '#4682b4',
 	),
 	'phone' => array(
 		'label' => __( 'Phone', 'so-widgets-bundle' ),
@@ -46,8 +46,8 @@ return array(
 	'skype' => array(
 		'label' => __( 'Skype', 'so-widgets-bundle' ),
 		'base_url' => 'https://skype.com/',
-		'icon_color' => '#0078d7',
-		'button_color' => '#ffffff',
+		'icon_color' => '#f5faff',
+		'button_color' => '#00adf0',
 	),
 	'linkedin' => array(
 		'label' => __( 'LinkedIn', 'so-widgets-bundle' ),
@@ -71,7 +71,7 @@ return array(
 		'label' => __( 'Instagram', 'so-widgets-bundle' ),
 		'base_url' => 'https://instagram.com/',
 		'icon_color' => '#ffffff',
-		'button_color' => '#3d739c',
+		'button_color' => '#405DE6',
 	),
 	'vk' => array(
 		'label' => __( 'VK', 'so-widgets-bundle' ),
@@ -124,6 +124,12 @@ return array(
 		'icon_color' => '#f1f1f1',
 		'button_color' => '#ff5722',
 	),
+	'bluesky' => array(
+		'label' => __( 'Bluesky', 'so-widgets-bundle' ),
+		'base_url' => 'https://bsky.social/',
+		'icon_color' => '#ffffff',
+		'button_color' => '#0886fe',
+	),
 	'codepen' => array(
 		'label' => __( 'Codepen', 'so-widgets-bundle' ),
 		'base_url' => 'https://codepen.io/',
@@ -165,6 +171,12 @@ return array(
 		'base_url' => 'https://github.com/',
 		'icon_color' => '#ffffff',
 		'button_color' => '#202021',
+	),
+	'gitlab' => array(
+		'label' => __( 'GitLab', 'so-widgets-bundle' ),
+		'base_url' => 'https://gitlab.com/',
+		'icon_color' => '#ffffff',
+		'button_color' => '#fc6d26',
 	),
 	'goodreads-g' => array(
 		'label' => __( 'Goodreads', 'so-widgets-bundle' ),

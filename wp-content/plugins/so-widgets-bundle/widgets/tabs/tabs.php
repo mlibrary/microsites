@@ -5,6 +5,7 @@ Description: Create tabbed content panels with customizable titles, content, ini
 Author: SiteOrigin
 Author URI: https://siteorigin.com
 Documentation: https://siteorigin.com/widgets-bundle/tabs-widget/
+Keywords: collapsible, content, expandable, faq, panel, section, tabbed, title, toggle, show/hide
 */
 
 class SiteOrigin_Widget_Tabs_Widget extends SiteOrigin_Widget {
@@ -231,13 +232,16 @@ class SiteOrigin_Widget_Tabs_Widget extends SiteOrigin_Widget {
 		$tabs = empty( $instance['tabs'] ) ? array() : $instance['tabs'];
 
 		foreach ( $tabs as $i => &$tab ) {
-			if ( empty( $tab['before_title'] ) ) {
-				$tab['before_title'] = '';
-			}
-
-			if ( empty( $tab['after_title'] ) ) {
-				$tab['after_title'] = '';
-			}
+			// before_title/after_title are filter-owned template slots (e.g.
+			// SiteOrigin Premium injects title-icon markup via the
+			// siteorigin_widgets_template_variables_{id_base} filter, which
+			// runs AFTER this method) — they are never legitimate instance
+			// data. Reset them unconditionally so a value stored in the
+			// instance (e.g. injected before the unknown-key strip existed,
+			// or carried by pre-strip-signed content on render paths that
+			// never pass through update()) can never reach the template.
+			$tab['before_title'] = '';
+			$tab['after_title'] = '';
 
 			if ( empty( $tab['title'] ) ) {
 				$id = $this->id_base;

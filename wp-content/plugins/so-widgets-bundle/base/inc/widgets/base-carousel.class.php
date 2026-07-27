@@ -90,14 +90,14 @@ abstract class SiteOrigin_Widget_Base_Carousel extends SiteOrigin_Widget {
 				'tablet_portrait' => true,
 				'mobile' => true,
 			),
-			'navigation_label' => __( 'Navigation arrows', 'so-widgets-bundle' ),
+			'navigation_label' => __( 'Navigation Arrows', 'so-widgets-bundle' ),
 			'navigation_dots' => array(
 				'desktop' => true,
 				'tablet_landscape' => true,
 				'tablet_portrait' => true,
 				'mobile' => true,
 			),
-			'navigation_dots_label' => __( 'Navigation dots', 'so-widgets-bundle' ),
+			'navigation_dots_label' => __( 'Navigation Dots', 'so-widgets-bundle' ),
 		);
 
 		$this->global_settings = wp_parse_args(
@@ -146,7 +146,7 @@ abstract class SiteOrigin_Widget_Base_Carousel extends SiteOrigin_Widget {
 
 			$section['fields']['slides_to_scroll'] = array(
 				'type' => 'number',
-				'label' => __( 'Slides to scroll', 'so-widgets-bundle' ),
+				'label' => __( 'Slides to Scroll', 'so-widgets-bundle' ),
 				'abs' => true,
 				'description' => sprintf(
 					__( 'Set the number of slides to scroll per navigation click or swipe on %s', 'so-widgets-bundle' ),
@@ -159,7 +159,7 @@ abstract class SiteOrigin_Widget_Base_Carousel extends SiteOrigin_Widget {
 				$section['fields']['slides_to_show'] = array(
 					'type' => 'number',
 					'abs' => true,
-					'label' => __( 'Slides to show ', 'so-widgets-bundle' ),
+					'label' => __( 'Slides to Show ', 'so-widgets-bundle' ),
 					'description' => sprintf(
 						__( 'The number of slides to show on %s.', 'so-widgets-bundle' ),
 						strtolower( $field['label'] )
@@ -285,7 +285,7 @@ abstract class SiteOrigin_Widget_Base_Carousel extends SiteOrigin_Widget {
 				),
 				'dots' => array(
 					'type' => 'checkbox',
-					'label' => __( 'Navigation dots', 'so-widgets-bundle' ),
+					'label' => __( 'Navigation Dots', 'so-widgets-bundle' ),
 					'default' => true,
 					'state_emitter' => array(
 						'callback' => 'conditional',
@@ -297,7 +297,7 @@ abstract class SiteOrigin_Widget_Base_Carousel extends SiteOrigin_Widget {
 				),
 				'arrows' => array(
 					'type' => 'checkbox',
-					'label' => __( 'Navigation arrows', 'so-widgets-bundle' ),
+					'label' => __( 'Navigation Arrows', 'so-widgets-bundle' ),
 					'default' => true,
 					'state_emitter' => array(
 						'callback' => 'conditional',
@@ -318,7 +318,7 @@ abstract class SiteOrigin_Widget_Base_Carousel extends SiteOrigin_Widget {
 				),
 				'animation_speed' => array(
 					'type' => 'number',
-					'label' => __( 'Animation speed', 'so-widgets-bundle' ),
+					'label' => __( 'Animation Speed', 'so-widgets-bundle' ),
 					'default' => 400,
 				),
 				'autoplay' => array(
@@ -334,7 +334,7 @@ abstract class SiteOrigin_Widget_Base_Carousel extends SiteOrigin_Widget {
 				),
 				'autoplay_pause_hover' => array(
 					'type' => 'checkbox',
-					'label' => __( 'Autoplay pause on hover', 'so-widgets-bundle' ),
+					'label' => __( 'Autoplay Pause on Hover', 'so-widgets-bundle' ),
 					'state_handler' => array(
 						'autoplay[show]' => array( 'show' ),
 						'autoplay[hide]' => array( 'hide' ),
@@ -440,7 +440,9 @@ abstract class SiteOrigin_Widget_Base_Carousel extends SiteOrigin_Widget {
 		}
 
 		// Negative values can be problematic so let's avoid them by ensuring everything is positive.
-		$variables = array_map( 'abs', $variables );
+		$variables = array_map( function( $value ) {
+			return is_null( $value ) ? 0 : abs( $value );
+		}, $variables );
 
 		return $encode ? json_encode( $variables ) : $variables;
 	}
@@ -474,7 +476,7 @@ abstract class SiteOrigin_Widget_Base_Carousel extends SiteOrigin_Widget {
 			'loop' => isset( $settings['loop'] ) ? $settings['loop'] : true,
 			'dots' => isset( $settings['dots'] ) ? $settings['dots'] : true,
 			'animation' => isset( $settings['animation'] ) ? $settings['animation'] : 'ease',
-			'animation_speed' => ! empty( $settings['animation_speed'] ) ? $settings['animation_speed'] : 400,
+			'animation_speed' => isset( $settings['animation_speed'] ) ? (int) $settings['animation_speed'] : 400,
 			'autoplay' => isset( $settings['autoplay'] ) ? $settings['autoplay'] : false,
 			'pauseOnHover' => isset( $settings['autoplay_pause_hover'] ) ? $settings['autoplay_pause_hover'] : false,
 			'autoplaySpeed' => ! empty( $settings['timeout'] ) ? $settings['timeout'] : 8000,
@@ -485,6 +487,18 @@ abstract class SiteOrigin_Widget_Base_Carousel extends SiteOrigin_Widget {
 	}
 
 	public function render_template( $settings, $args, $instance ) {
+		if (
+			! empty( $settings['container_classes'] ) &&
+			is_array( $settings['container_classes'] )
+		) {
+			$container_classes = implode(
+				array_map(
+					'sanitize_html_class',
+					$settings['container_classes']
+				)
+			);
+		}
+
 		include plugin_dir_path( __FILE__ ) . 'tpl/carousel.php';
 	}
 

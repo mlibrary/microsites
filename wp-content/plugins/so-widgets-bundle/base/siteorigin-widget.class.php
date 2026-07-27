@@ -274,7 +274,7 @@ abstract class SiteOrigin_Widget extends WP_Widget {
 		$wrapper_attr_string = '';
 
 		foreach ( $data as $name => $value ) {
-			$wrapper_attr_string .= ' data-' . esc_html( $name ) . '="' . esc_attr( $value ) . '"';
+			$wrapper_attr_string .= ' data-' . siteorigin_sanitize_attribute_key( $name ) . '="' . esc_attr( $value ) . '"';
 		}
 
 		return $wrapper_attr_string;
@@ -397,23 +397,38 @@ abstract class SiteOrigin_Widget extends WP_Widget {
 	/**
 	 * Add default values to the instance.
 	 */
-	public function add_defaults( $form, $instance, $level = 0 ) {
+	public function add_defaults( $form, $instance = array(), $level = 0 ) {
 		if ( $level > 10 ) {
+			return $instance;
+		}
+		
+		// Ensure $instance is an array - if not, return it as-is to prevent type errors.
+		if ( ! is_array( $instance ) ) {
 			return $instance;
 		}
 
 		foreach ( $form as $id => $field ) {
+			// Skip if field is not an array or doesn't have a type.
+			if ( ! is_array( $field ) || ! isset( $field['type'] ) ) {
+				continue;
+			}
+			
 			if ( $field['type'] == 'repeater' ) {
-				if ( ! empty( $instance[ $id ] ) ) {
+				if ( isset( $instance[ $id ] ) && is_array( $instance[ $id ] ) ) {
 					foreach ( array_keys( $instance[ $id ] ) as $i ) {
-						$instance[ $id ][ $i ] = $this->add_defaults( $field['fields'], $instance[ $id ][ $i ], $level + 1 );
+						$instance[ $id ][ $i ] = $this->add_defaults( $field['fields'] ?? array(), $instance[ $id ][ $i ], $level + 1 );
 					}
 				}
 			} elseif ( $field['type'] == 'section' ) {
+				if ( empty( $instance ) ) {
+					$instance = array();
+				}
+
 				if ( empty( $instance[ $id ] ) ) {
 					$instance[ $id ] = array();
 				}
-				$instance[ $id ] = $this->add_defaults( $field['fields'], $instance[ $id ], $level + 1 );
+
+				$instance[ $id ] = $this->add_defaults( $field['fields'] ?? array(), $instance[ $id ], $level + 1 );
 			} elseif ( $field['type'] == 'measurement' ) {
 				if ( ! isset( $instance[ $id ] ) ) {
 					$instance[ $id ] = isset( $field['default'] ) ? $field['default'] : '';
@@ -428,9 +443,49 @@ abstract class SiteOrigin_Widget extends WP_Widget {
 						$instance[ $id ] = $field['default'];
 					} else {
 						// If no default order is specified, just use the order of the options.
-						$instance[ $id ] = array_keys( $field['options'] );
+						$instance[ $id ] = array_keys( $field['options'] ?? array() );
 					}
 				}
+
+			} elseif ( $field['type'] === 'widget' ) {
+				// We need to load the widget to be able to get its defaults.
+				if ( ! isset( $field['class'] ) ) {
+					continue;
+				}
+				$sub_widget = new $field['class'];
+				if ( ! is_a( $sub_widget, 'SiteOrigin_Widget' ) ) {
+					continue;
+				}
+
+				if ( empty( $instance[ $id ] ) ) {
+					$instance[ $id ] = array();
+				}
+
+				// Does this widget have a form filter?
+				if (
+					! empty( $field['form_filter'] ) &&
+					is_callable( $field['form_filter'] )
+				) {
+
+					$fields = call_user_func(
+						$field['form_filter'],
+						$sub_widget->form_options()
+					);
+
+					$instance[ $id ] = $this->add_defaults(
+						$fields,
+						$instance[ $id ],
+						$level + 1
+					);
+
+					continue;
+				}
+
+				$instance[ $id ] = $this->add_defaults(
+					$sub_widget->form_options(),
+					$instance[ $id ],
+					$level + 1
+				);
 			} elseif ( ! isset( $instance[ $id ] ) ) {
 				$instance[ $id ] = isset( $field['default'] ) ? $field['default'] : '';
 			}
@@ -473,6 +528,14 @@ abstract class SiteOrigin_Widget extends WP_Widget {
 		$form_id = 'siteorigin_widget_form_' . md5( $id );
 		$class_name = str_replace( '_', '-', strtolower( $this->widget_class ) );
 
+		// Handle cases where instance is a JSON string (e.g., from WooCommerce REST API updates).
+		if ( is_string( $instance ) ) {
+			$instance = json_decode( $instance, true );
+			if ( ! is_array( $instance ) ) {
+				$instance = array();
+			}
+		}
+
 		if ( empty( $instance['_sow_form_id'] ) ) {
 			$instance['_sow_form_id'] = $id;
 		}
@@ -508,12 +571,16 @@ abstract class SiteOrigin_Widget extends WP_Widget {
 
 		<?php if ( $this->show_preview_button() ) { ?>
 			<div class="siteorigin-widget-preview" style="display: none">
-				<a href="#" class="siteorigin-widget-preview-button button-secondary"><?php _e( 'Preview', 'so-widgets-bundle' ); ?></a>
+				<a href="#" class="siteorigin-widget-preview-button button-secondary">
+					<?php echo esc_html__( 'Preview', 'so-widgets-bundle' ); ?>
+				</a>
 			</div>
 		<?php } ?>
 
 		<?php if ( ! empty( $this->widget_options['help'] ) ) { ?>
-			<a href="<?php echo sow_esc_url( $this->widget_options['help'] ); ?>" class="siteorigin-widget-help-link siteorigin-panels-help-link" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Help', 'so-widgets-bundle' ); ?></a>
+			<a href="<?php echo sow_esc_url( $this->widget_options['help'] ); ?>" class="siteorigin-widget-help-link siteorigin-panels-help-link" target="_blank" rel="noopener noreferrer">
+				<?php esc_html_e( 'Help', 'so-widgets-bundle' ); ?>
+			</a>
 		<?php } ?>
 
 		<script type="text/javascript">
@@ -561,12 +628,22 @@ abstract class SiteOrigin_Widget extends WP_Widget {
 				if ( is_array( $teaser ) ) {
 					$teaser = $teaser[ array_rand( $teaser ) ];
 				}
-
 				?>
-				<div class="siteorigin-widget-teaser">
-					<?php echo wp_kses_post( $teaser ); ?>.
-					<span class="dashicons dashicons-dismiss" data-dismiss-url="<?php echo esc_url( $dismiss_url ); ?>"></span>
-				</div>
+				<section class="siteorigin-widget-teaser">
+					<p class="siteorigin-widget-teaser-message">
+						<?php echo wp_kses_post( $teaser ); ?>.
+					</p>
+
+					<button
+						type="button"
+						class="siteorigin-widget-teaser-dismiss dashicons dashicons-dismiss"
+						data-dismiss-url="<?php echo esc_url( $dismiss_url ); ?>"
+					>
+						<span class="screen-reader-text">
+							<?php esc_html_e( 'Dismiss this message', 'so-widgets-bundle' ); ?>
+						</span>
+					</button>
+				</section>
 				<?php
 			}
 		}
@@ -584,8 +661,12 @@ abstract class SiteOrigin_Widget extends WP_Widget {
 
 	public function scripts_loading_message() {
 		?>
-		<p><strong><?php _e( 'This widget has scripts and styles that need to be loaded before you can use it. Please save and reload your current page.', 'so-widgets-bundle' ); ?></strong></p>
-		<p><strong><?php _e( 'You will only need to do this once.', 'so-widgets-bundle' ); ?></strong></p>
+		<p>
+			<strong><?php echo esc_html__( 'This widget has scripts and styles that need to be loaded before you can use it. Please save and reload your current page.', 'so-widgets-bundle' ); ?></strong>
+		</p>
+		<p>
+			<strong><?php echo esc_html__( 'You will only need to do this once.', 'so-widgets-bundle' ); ?></strong>
+		</p>
 		<?php
 	}
 
@@ -621,6 +702,7 @@ abstract class SiteOrigin_Widget extends WP_Widget {
 					'actions' => __( 'Actions', 'so-widgets-bundle' ),
 				),
 				'backup' => array(
+					'enabled' => apply_filters( 'siteorigin_widgets_backup', true ),
 					'newerVersion' => __( "There is a newer version of this widget's content available.", 'so-widgets-bundle' ),
 					'restore' => __( 'Restore', 'so-widgets-bundle' ),
 					'dismiss' => __( 'Dismiss', 'so-widgets-bundle' ),
@@ -629,6 +711,8 @@ abstract class SiteOrigin_Widget extends WP_Widget {
 						'<em>' . __( 'Restore', 'so-widgets-bundle' ) . '</em>'
 					),
 				),
+				'fonts' => siteorigin_widgets_font_families(),
+				'icons' => array(),
 			) );
 
 			if ( ! class_exists( 'FLBuilderModel' ) || ! FLBuilderModel::is_builder_active() ) {
@@ -670,7 +754,7 @@ abstract class SiteOrigin_Widget extends WP_Widget {
 			$field = $field_factory->create_field( $field_name, $field_options, $this );
 			$field->enqueue_scripts();
 
-			if ( ! empty( $field_options['fields'] ) ) {
+			if ( is_array( $field_options ) && ! empty( $field_options['fields'] ) ) {
 				$this->enqueue_field_scripts( $field_options['fields'] );
 			}
 		}
@@ -686,7 +770,9 @@ abstract class SiteOrigin_Widget extends WP_Widget {
 				<div class="so-widgets-dialog-overlay"></div>
 
 				<div class="so-widgets-toolbar">
-					<h3><?php _e( 'Widget Preview', 'so-widgets-bundle' ); ?></h3>
+					<h3>
+						<?php echo esc_html__( 'Widget Preview', 'so-widgets-bundle' ); ?>
+					</h3>
 					<div class="close" tabindex="0"><span class="dashicons dashicons-arrow-left-alt2"></span></div>
 				</div>
 
@@ -733,24 +819,36 @@ abstract class SiteOrigin_Widget extends WP_Widget {
 
 		if ( ! empty( $form_options ) ) {
 			if ( isset( $_GET['fl_builder'] ) && is_array( $new_instance ) ) {
-				$key = array_keys( $new_instance )[0];
-				$new_instance = $this->update_fields(
-					$new_instance[ $key ],
-					$old_instance,
-					$form_options
-				);
-			} else {
-				$new_instance = $this->update_fields(
-					$new_instance,
-					$old_instance,
-					$form_options
-				);
+				// Beaver Builder wraps the submitted instance in an extra
+				// array level — unwrap it before migrating/sanitizing.
+				$new_instance = $new_instance[ array_keys( $new_instance )[0] ];
 			}
+
+			// Migrate any legacy instance shape BEFORE sanitizing: update()
+			// can receive stored instances directly (e.g. the block editor's
+			// render/save paths and widget previews) without widget()/form()
+			// having run modify_instance() first, and update_fields()'
+			// unknown-key strip would otherwise delete un-migrated legacy
+			// keys before modify_instance() could move their data into
+			// current declared fields. modify_instance() implementations are
+			// isset/empty-guarded no-ops on already-current instances, so
+			// this is safe to run on every save.
+			$new_instance = $this->modify_instance( $new_instance );
+
+			$new_instance = $this->update_fields(
+				$new_instance,
+				$old_instance,
+				$form_options
+			);
 		}
 
 		// Remove the old CSS, it'll be regenerated on page load.
 		if ( $form_type == 'widget' ) {
 			$this->delete_css( $this->modify_instance( $old_instance ) );
+		}
+
+		if ( $new_instance !== $old_instance ) {
+			$new_instance['_sow_form_timestamp'] = round( microtime( true ) * 1000 );
 		}
 
 		return $new_instance;
@@ -777,6 +875,25 @@ abstract class SiteOrigin_Widget extends WP_Widget {
 				);
 				$new_instance = $field->sanitize_instance( $new_instance );
 			}
+
+			// Strip any instance key that isn't a declared form field, a
+			// field-declared companion key (e.g. a media field's fallback URL,
+			// a tinymce field's selected-editor mode), or known plugin
+			// bookkeeping. An unrecognized key was never routed through any
+			// field's sanitize(), so it must not be allowed to persist
+			// unsanitized (e.g. injected via a crafted save payload).
+			$known_keys = array_keys( $form_options );
+
+			foreach ( $this->fields as $field ) {
+				$known_keys = array_merge( $known_keys, $field->get_related_instance_keys() );
+			}
+
+			$known_keys = array_merge(
+				$known_keys,
+				array( '_sow_form_id', '_sow_form_timestamp', 'panels_info' )
+			);
+
+			$new_instance = array_intersect_key( $new_instance, array_flip( $known_keys ) );
 
 			// Let other plugins also sanitize the instance
 			$new_instance = apply_filters( 'siteorigin_widgets_sanitize_instance', $new_instance, $form_options, $this );
