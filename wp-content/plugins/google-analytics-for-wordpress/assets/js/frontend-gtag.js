@@ -324,6 +324,10 @@ var MonsterInsights = function () {
       return el.alt.replace(/\n/ig, '');
     } else if (el.textContent && el.textContent.replace(/\n/ig, '')) {
       return el.textContent.replace(/\n/ig, '');
+    } else if (el.firstChild && el.firstChild.tagName == "IMG") {
+      return el.firstChild.src;
+    } else if (el.href) {
+      return el.href;
     } else {
       return undefined;
     }
@@ -463,6 +467,7 @@ var MonsterInsights = function () {
               file_name: valuesArray.link.replace(/^.*\//g, ''),
               link_text: label || valuesArray.title,
               link_url: link,
+              link_type: 'download',
               link_domain: valuesArray.el_hostname,
               link_classes: valuesArray.el_classes,
               link_id: valuesArray.el_id,
@@ -474,6 +479,7 @@ var MonsterInsights = function () {
               tel_number: link.replace('tel:', ''),
               link_text: label || valuesArray.title,
               link_url: link,
+              link_type: 'tel',
               link_classes: valuesArray.el_classes,
               link_id: valuesArray.el_id,
             };
@@ -484,6 +490,7 @@ var MonsterInsights = function () {
               email_address: link.replace('mailto:', ''),
               link_text: label || valuesArray.title.replace('mailto:', ''),
               link_url: link,
+              link_type: 'mailto',
               link_classes: valuesArray.el_classes,
               link_id: valuesArray.el_id,
             };
@@ -496,6 +503,7 @@ var MonsterInsights = function () {
               affiliate_label: internalAsOutboundCategory.replace('outbound-link-', ''),
               link_text: label || valuesArray.title,
               link_url: link,
+              link_type: 'affiliate',
               link_domain: valuesArray.el_hostname,
               link_classes: valuesArray.el_classes,
               link_id: valuesArray.el_id,
@@ -508,6 +516,7 @@ var MonsterInsights = function () {
               is_affiliate_link: false,
               link_text: label || valuesArray.title,
               link_url: link,
+              link_type: 'outbound',
               link_domain: valuesArray.el_hostname,
               link_classes: valuesArray.el_classes,
               link_id: valuesArray.el_id,
@@ -534,6 +543,7 @@ var MonsterInsights = function () {
                 event_label: label || valuesArray.title,
                 link_text: label || valuesArray.title,
                 link_url: link,
+                link_type: 'internal',
                 link_domain: valuesArray.el_hostname,
                 link_classes: valuesArray.el_classes,
                 link_id: valuesArray.el_id,
@@ -566,6 +576,7 @@ var MonsterInsights = function () {
               file_name: valuesArray.link.replace(/^.*\//g, ''),
               link_text: label || valuesArray.title,
               link_url: link,
+              link_type: 'download',
               link_domain: valuesArray.el_hostname,
               link_classes: valuesArray.el_classes,
               link_id: valuesArray.el_id,
@@ -591,6 +602,7 @@ var MonsterInsights = function () {
                 affiliate_label: internalAsOutboundCategory.replace('outbound-link-', ''),
                 link_text: label || valuesArray.title,
                 link_url: link,
+                link_type: 'affiliate',
                 link_domain: valuesArray.el_hostname,
                 link_classes: valuesArray.el_classes,
                 link_id: valuesArray.el_id,
@@ -616,6 +628,7 @@ var MonsterInsights = function () {
                 is_affiliate_link: false,
                 link_text: label || valuesArray.title,
                 link_url: link,
+                link_type: 'outbound',
                 link_domain: valuesArray.el_hostname,
                 link_classes: valuesArray.el_classes,
                 link_id: valuesArray.el_id,
@@ -665,6 +678,7 @@ var MonsterInsights = function () {
                 event_callback: __gtagTrackerHitBack,
                 link_text: label || valuesArray.title,
                 link_url: link,
+                link_type: 'internal',
                 link_domain: valuesArray.el_hostname,
                 link_classes: valuesArray.el_classes,
                 link_id: valuesArray.el_id,

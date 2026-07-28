@@ -23,7 +23,7 @@ $roles        = $capsman->roles;
 $default_role = $capsman->get_last_role();
 
 //add logged in and guest option
-$ppc_other_permissions = ["ppc_users" => esc_html__('Logged In Users', 'capsman-enhanced'), "ppc_guest" => esc_html__('Logged Out Users', 'capsman-enhanced')];
+$ppc_other_permissions = ["ppc_users" => esc_html__('Logged In Users', 'capability-manager-enhanced'), "ppc_guest" => esc_html__('Logged Out Users', 'capability-manager-enhanced')];
 
 if (!empty($_REQUEST['role'])) {
 
@@ -58,7 +58,7 @@ $nav_menu_item_option = array_key_exists($default_role, $nav_menu_item_option) ?
 
     <div class="wrap publishpress-caps-manage pressshack-admin-wrapper pp-capability-menus-wrapper nav-menus">
         <div id="icon-capsman-admin" class="icon32"></div>
-        <h2><?php esc_html_e('Navigation Menu Restrictions', 'capsman-enhanced'); ?></h2>
+        <h2><?php esc_html_e('Navigation Menu Restrictions', 'capability-manager-enhanced'); ?></h2>
 
         <form method="post" id="ppc-nav-menu-form" action="admin.php?page=pp-capabilities-nav-menus">
             <?php wp_nonce_field('pp-capabilities-nav-menus'); ?>
@@ -71,7 +71,7 @@ $nav_menu_item_option = array_key_exists($default_role, $nav_menu_item_option) ?
 
                                     <div class="publishpress-filters">
                                         <select name="ppc-nav-menu-role" class="ppc-nav-menu-role">
-                                            <optgroup label="Users">
+                                            <optgroup label="<?php esc_attr_e('Users');?>">
                                                 <?php
                                                 foreach ($ppc_other_permissions as $p_value => $p_title) {
                                                     ?>
@@ -82,7 +82,7 @@ $nav_menu_item_option = array_key_exists($default_role, $nav_menu_item_option) ?
                                                 ?>
                                             </optgroup>
 
-                                            <optgroup label="Roles">
+                                            <optgroup label="<?php esc_attr_e('Roles');?>">
                                                 <?php
                                                 foreach ($roles as $role_name => $name) {
                                                     $name = translate_user_role($name);
@@ -98,7 +98,7 @@ $nav_menu_item_option = array_key_exists($default_role, $nav_menu_item_option) ?
                                         <img class="loading" src="<?php echo esc_url($capsman->mod_url); ?>/images/wpspin_light.gif" style="display: none">
 
                                         <input type="submit" name="nav-menu-submit"
-                                            value="<?php esc_attr_e('Save Changes', 'capsman-enhanced') ?>"
+                                            value="<?php esc_attr_e('Save Changes');?>"
                                             class="button-primary ppc-nav-menu-submit" style="float:right" />
                                     </div>
 
@@ -124,7 +124,7 @@ $nav_menu_item_option = array_key_exists($default_role, $nav_menu_item_option) ?
                                                                     <label for="check-all-item">
                                                                 <span class="menu-item-link check-all-menu-link">
                                                                     <strong>
-                                                                    <?php esc_html_e('Toggle all', 'capsman-enhanced'); ?>
+                                                                    <?php esc_html_e('Toggle all', 'capability-manager-enhanced'); ?>
                                                                     </strong>
                                                                 </span></label>
                                                                 </td>
@@ -144,7 +144,7 @@ $nav_menu_item_option = array_key_exists($default_role, $nav_menu_item_option) ?
                                                                     <label for="check-all-item-2">
                                                                     <span class="menu-item-link check-all-menu-link">
                                                                     <strong>
-                                                                        <?php esc_html_e('Toggle all', 'capsman-enhanced'); ?>
+                                                                        <?php esc_html_e('Toggle all', 'capability-manager-enhanced'); ?>
                                                                     </strong>
                                                                     </span>
                                                                     </label>
@@ -154,7 +154,7 @@ $nav_menu_item_option = array_key_exists($default_role, $nav_menu_item_option) ?
                                                         </tfoot>
 
                                                         <tbody>
-                                                        
+
                                                         <?php
 
                                                         if (count($nav_menus) > 0) {
@@ -163,20 +163,20 @@ $nav_menu_item_option = array_key_exists($default_role, $nav_menu_item_option) ?
                                                             foreach ($nav_menus as $menu_id => $menu_name) {
                                                                 ?>
 
-                                                                <tr class="ppc-menu-row parent-menu section-menu opened" 
+                                                                <tr class="ppc-menu-row parent-menu section-menu opened"
                                                                     data-menu-id="<?php echo esc_attr($menu_id); ?>"
                                                                     >
 
-                                                                    <td class="menu-column ppc-menu-item parent features-section-header restrict-column ppc-menu-checkbox" style="text-align: left;" colspan="2">
+                                                                    <td class="restrict-column ppc-menu-checkbox">&nbsp;</td>
+
+                                                                    <td class="menu-column ppc-menu-item parent features-section-header restrict-column ppc-menu-checkbox" style="text-align: left;">
 
                                                                         <label for="check-item-<?php echo (int) $sn; ?>">
                                                                         <span class="menu-item-link">
                                                                         <strong>
-                                                                        <i class="dashicons dashicons-welcome-widgets-menus"></i> 
-                                                                            <?php if ($fse_theme) : ?>
-                                                                                <span class="ppc-nav-menu-expand"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><path d="M10.8622 8.04053L14.2805 12.0286L10.8622 16.0167L9.72327 15.0405L12.3049 12.0286L9.72327 9.01672L10.8622 8.04053Z"></path></svg></span>
-                                                                            <?php else : ?>
-                                                                            <i class="dashicons dashicons-menu-alt"></i>
+                                                                        <i class="dashicons dashicons-open-folder"></i>
+                                                                            <?php if (!$fse_theme) : ?>
+                                                                                <i class="dashicons dashicons-arrow-right"></i>
                                                                             <?php endif; ?>
                                                                             <span class="ppc-nav-item-title"><?php echo esc_html(wp_strip_all_tags($menu_name)); ?></span>
                                                                         </strong></span>
@@ -213,7 +213,7 @@ $nav_menu_item_option = array_key_exists($default_role, $nav_menu_item_option) ?
                                                                     } else {
                                                                         $depth_space = '&emsp;&emsp;';
                                                                     }
-                                                                    
+
                                                                     if (isset($menu_item->depth) && $menu_item->depth > 0) {
                                                                         if (isset($menu_item->is_parent_page) && $menu_item->is_parent_page === 1 && $menu_item->depth === 1) {
                                                                             //depth?
@@ -251,7 +251,7 @@ $nav_menu_item_option = array_key_exists($default_role, $nav_menu_item_option) ?
                                                                                 <?php echo $depth_space; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
                                                                                 <?php if ($fse_theme) : ?>
                                                                                     <span class="ppc-nav-item-title">
-                                                                                        <?php echo $menu_item->title; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+                                                                                        <?php echo esc_html(wp_strip_all_tags($menu_item->title)); ?>
                                                                                     </span>
                                                                                 <?php else : ?>
                                                                                 <?php echo esc_html(wp_strip_all_tags($menu_item->title)); ?>
@@ -272,7 +272,7 @@ $nav_menu_item_option = array_key_exists($default_role, $nav_menu_item_option) ?
                                                         } else {
                                                             ?>
                                                             <tr>
-                                                                <td colspan="2"> <?php esc_html_e('There are no frontend menu links. To control access to navigation menus, please add menu links.', 'capsman-enhanced'); ?></td>
+                                                                <td colspan="2"> <?php esc_html_e('There are no frontend menu links. To control access to navigation menus, please add menu links.', 'capability-manager-enhanced'); ?></td>
                                                             </tr>
                                                             <?php
                                                         }
@@ -286,8 +286,8 @@ $nav_menu_item_option = array_key_exists($default_role, $nav_menu_item_option) ?
                                         </div>
                                     </div>
                                     <input type="submit" name="nav-menu-submit"
-                                        value="<?php esc_attr_e('Save Changes', 'capsman-enhanced') ?>"
-                                        class="button-primary ppc-nav-menu-submit"/>
+                                        value="<?php esc_attr_e('Save Changes');?>"
+                                        class="button-primary ppc-nav-menu-submit ppc-footer-button" style="float:right"/>
 
                                 </td>
                             </tr>
@@ -296,15 +296,17 @@ $nav_menu_item_option = array_key_exists($default_role, $nav_menu_item_option) ?
                     </fieldset>
                 </div><!-- .pp-column-left -->
                 <div class="pp-column-right pp-capabilities-sidebar">
-                <?php 
+                <?php
                 $banner_messages = ['<p>'];
-                $banner_messages[] = esc_html__('Nav Menus allows you to block access to frontend menu links.', 'capsman-enhanced');
+                $banner_messages[] = esc_html__('Navigation Menus allows you to block access to frontend menu links.', 'capability-manager-enhanced');
                 $banner_messages[] = '</p><p>';
-                $banner_messages[] = sprintf(esc_html__('%1$s = No change', 'capsman-enhanced'), '<input type="checkbox" title="'. esc_attr__('usage key', 'capsman-enhanced') .'" disabled>') . ' <br />';
-                $banner_messages[] = sprintf(esc_html__('%1$s = This feature is denied', 'capsman-enhanced'), '<input type="checkbox" title="'. esc_attr__('usage key', 'capsman-enhanced') .'" checked disabled>') . ' <br />';
+                $banner_messages[] = '<input type="checkbox" title="'. esc_attr__('usage key', 'capability-manager-enhanced') .'" disabled> = '
+                    . esc_html__('No change', 'capability-manager-enhanced') . ' <br />';
+                $banner_messages[] = '<input type="checkbox" title="'. esc_attr__('usage key', 'capability-manager-enhanced') .'" checked disabled> = '
+                    . esc_html__('This feature is denied', 'capability-manager-enhanced') . ' <br />';
                 $banner_messages[] = '</p>';
-                $banner_messages[] = '<p><a class="button ppc-checkboxes-documentation-link" href="https://publishpress.com/knowledge-base/nav-menus/"target="blank">' . esc_html__('View Documentation', 'capsman-enhanced') . '</a></p>';
-                $banner_title  = __('How to use Nav Menus', 'capsman-enhanced');
+                $banner_messages[] = '<p><a class="button ppc-checkboxes-documentation-link" href="https://publishpress.com/knowledge-base/nav-menus/"target="blank">' . esc_html__('View Documentation', 'capability-manager-enhanced') . '</a></p>';
+                $banner_title  = __('How to use Navigation Menus', 'capability-manager-enhanced');
                 pp_capabilities_sidebox_banner($banner_title, $banner_messages);
                 // add promo sidebar
                 pp_capabilities_pro_sidebox();

@@ -1,4 +1,9 @@
 <?php
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * This is the base class for the Popular Posts output functionality.
  * Each actual Popular Posts option extends this class (inline, widget, products).
@@ -169,11 +174,15 @@ class MonsterInsights_Popular_Posts {
 		}
 		$suffix = ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ) ? '' : '.min';
 
+		$url = apply_filters(
+			'monsterinsights_frontend_style_url',
+			plugins_url( 'assets/css/frontend' . $suffix . '.css', MONSTERINSIGHTS_PLUGIN_FILE )
+		);
+
 		// Load Popular Posts styles.
-		wp_register_style( 'monsterinsights-popular-posts-style', plugins_url( 'assets/css/frontend' . $suffix . '.css', MONSTERINSIGHTS_PLUGIN_FILE ), array(), monsterinsights_get_asset_version() );
+		wp_register_style( 'monsterinsights-editor-frontend-style', $url, array(), monsterinsights_get_asset_version() );
 
 		$this->add_theme_specific_styles();
-
 	}
 
 	/**
@@ -192,8 +201,8 @@ class MonsterInsights_Popular_Posts {
 		monsterinsights_localize_script( 'monsterinsights-popular-posts-js', 'monsterinsights_pp', array(
 			'ajaxurl' => admin_url( 'admin-ajax.php' ),
 			'post_id' => get_the_ID(),
+			'nonce'   => wp_create_nonce('mi-popular-posts'),
 		) );
-
 	}
 
 	/**
@@ -202,7 +211,7 @@ class MonsterInsights_Popular_Posts {
 	public function add_theme_specific_styles() {
 
 		if ( ! self::$styles_printed ) {
-			wp_add_inline_style( 'monsterinsights-popular-posts-style', $this->get_inline_styles() );
+			wp_add_inline_style( 'monsterinsights-editor-frontend-style', $this->get_inline_styles() );
 			self::$styles_printed = true;
 		}
 
@@ -240,7 +249,7 @@ class MonsterInsights_Popular_Posts {
 	 */
 	public function shortcode_output( $args ) {
 		// Load frontend.css file when shortcode is available
-		wp_enqueue_style( 'monsterinsights-popular-posts-style' );
+		wp_enqueue_style( 'monsterinsights-editor-frontend-style' );
 
 		if ( $this->ajaxify ) {
 			return $this->get_ajax_json_data( $args );
@@ -353,7 +362,7 @@ class MonsterInsights_Popular_Posts {
 				'srcset'      => $post_image_srcset,
 				'image_id'    => $post_thumbnail,
 				'author'      => $post->post_author,
-				'author_name' => $author_data->display_name,
+				'author_name' => $author_data ? $author_data->display_name : '',
 				'date'        => get_the_date( '', $post->ID ),
 				'comments'    => get_comments_number( $post->ID ),
 			);
@@ -370,9 +379,10 @@ class MonsterInsights_Popular_Posts {
 	private function get_query_args() {
 
 		$args = array(
-			'numberposts'         => $this->posts_count,
+			'numberposts'         => 25,
 			'ignore_sticky_posts' => true,
 			'fields'              => 'ids',
+			'orderby'              => 'rand', // phpcs:ignore WordPressVIPMinimum.Performance.OrderByRand.orderby_orderby
 		);
 		$args = wp_parse_args( $this->query_args(), $args );
 
@@ -403,13 +413,16 @@ class MonsterInsights_Popular_Posts {
 	 * @return array
 	 */
 	protected function get_query_args_comments() {
-
-		$query_args = array(
-			'orderby' => 'comment_count',
-			'order'   => 'DESC',
+		return array(
+			'orderby'    => 'comment_count',
+			'order'      => 'DESC',
+			'date_query' => array(
+				array(
+					'after'     => '-1 month',
+					'inclusive' => true,
+				),
+			)
 		);
-
-		return $query_args;
 	}
 
 	/**
@@ -545,7 +558,9 @@ class MonsterInsights_Popular_Posts {
 						if ( 'border' === $element || 'border' === $style_key ) {
 							$style_key = 'border-color';
 						}
-						$style_css .= $style_key . ':' . $atts[ $atts_key ] . ';';
+						$safe_value = wp_strip_all_tags( (string) $atts[ $atts_key ] );
+						$safe_value = str_replace( array( ';', '{', '}', '<', '>' ), '', $safe_value );
+						$style_css .= $style_key . ':' . $safe_value . ';';
 					}
 				}
 			}
@@ -629,7 +644,13 @@ class MonsterInsights_Popular_Posts {
 		}
 
 		if ( isset( $atts['className'] ) ) {
-			$classes[] = $atts['className'];
+			$raw_classes = preg_split( '/\s+/', (string) $atts['className'] );
+			foreach ( (array) $raw_classes as $raw_class ) {
+				$safe_class = sanitize_html_class( $raw_class );
+				if ( '' !== $safe_class ) {
+					$classes[] = $safe_class;
+				}
+			}
 		}
 
 		$classname = implode( ' ', $classes );
@@ -647,7 +668,7 @@ class MonsterInsights_Popular_Posts {
 	public function is_current_post( $id ) {
 
 		if ( defined( 'DOING_AJAX' ) && DOING_AJAX ) {
-			$current_id = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : false;
+			$current_id = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : false; // phpcs:ignore WordPress.Security.NonceVerification.Missing
 
 			return $id === $current_id;
 		}

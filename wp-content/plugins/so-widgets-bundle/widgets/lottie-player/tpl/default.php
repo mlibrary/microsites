@@ -6,7 +6,11 @@ if ( empty( $file ) ) {
 }
 ?>
 
-<div class="sow-lottie-player" <?php if ( ! empty( $url ) ) { ?>style="position: relative;"<?php } ?>>
+<div class="sow-lottie-player" 
+<?php
+if ( ! empty( $url ) ) {
+	?>
+	style="position: relative;"<?php } ?>>
 	<?php if ( ! empty( $url ) ) { ?>
 		<?php $bottom = ! empty( $attributes['controls'] ) ? '35px' : 0; ?>
 		<a
@@ -23,9 +27,9 @@ if ( empty( $file ) ) {
 		foreach ( $attributes as $name => $value ) {
 			if ( ! empty( $value ) ) {
 				if ( $value === true ) {
-					echo esc_attr( "$name " );
+					echo siteorigin_sanitize_attribute_key( $name ) . ' ';
 				} else {
-					echo esc_attr( $name ) . '="' . esc_attr( $value ) . '" ';
+					echo siteorigin_sanitize_attribute_key( $name ) . '="' . esc_attr( $value ) . '" ';
 				}
 			}
 		}

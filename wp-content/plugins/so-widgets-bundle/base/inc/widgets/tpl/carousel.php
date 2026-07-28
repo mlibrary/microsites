@@ -26,7 +26,7 @@
 		<?php
 		foreach ( $settings['attributes'] as $n => $v ) {
 			if ( ! empty( $n ) ) {
-				echo 'data-' . esc_html( $n ) . '="' . esc_attr( $v ) . '" ';
+				echo 'data-' . siteorigin_sanitize_attribute_key( $n ) . '="' . esc_attr( $v ) . '" ';
 			}
 		}
 		?>
@@ -39,7 +39,7 @@
 			}
 			?>
 		>
-			<?php include $settings['item_template']; ?>
+			<?php require $settings['item_template']; ?>
 		</div>
 		<?php if ( $settings['navigation'] == 'container' || $settings['navigation'] == 'full' ) { ?>
 			<div class="sow-carousel-nav" <?php echo ! $settings['navigation_arrows'] && empty( $settings['navigation_dots'] ) ? 'style="display: none;"' : ''; ?>>

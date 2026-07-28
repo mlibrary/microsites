@@ -6,7 +6,7 @@
 			<?php do_action( 'siteorigin_widgets_author_box_avatar_above', $instance ); ?>
 			<?php if ( $link_avatar ) { ?>
 				<a href="<?php echo esc_url( get_author_posts_url( get_the_author_meta( 'ID' ) ) ); ?>">
-			<?php
+				<?php
 			}
 
 			echo get_avatar(
@@ -17,15 +17,17 @@
 			if ( $link_avatar ) {
 				?>
 				</a>
-			<?php } ?>
-			<?php do_action( 'siteorigin_widgets_author_box_avatar_below', $instance ); ?>
+				<?php
+			}
+			do_action( 'siteorigin_widgets_author_box_avatar_below', $instance );
+			?>
 		</div>
 	<?php } ?>
 	<div class="sow-author-box-description">
 		<?php do_action( 'siteorigin_widgets_author_box_description_above', $instance ); ?>
 
 		<div class="sow-author-box-title-wrapper">
-			<h4 class="sow-author-box-title">
+			<<?php echo esc_html( $title_tag ); ?> class="sow-author-box-title">
 				<?php if ( $link_name ) { ?>
 					<a href="<?php echo esc_urL( get_author_posts_url( get_the_author_meta( 'ID' ) ) ); ?>"  class="sow-author-box-author">
 					<?php
@@ -36,7 +38,7 @@
 					?>
 					</a>
 				<?php } ?>
-			</h4>
+			</<?php echo esc_html( $title_tag ); ?>>
 
 			<?php
 			ob_start();
@@ -53,7 +55,7 @@
 		<div class="sow-author-box-info">
 			<?php if ( $link_all_posts ) { ?>
 				<a href="<?php echo esc_urL( get_author_posts_url( get_the_author_meta( 'ID' ) ) ); ?>" class="sow-author-box-author-all">
-					<?php esc_html_e( sprintf( 'View posts by %s', get_the_author() ), 'so-widgets-bundle' ); ?>
+					<?php printf( esc_html__( 'View posts by %s', 'so-widgets-bundle' ), get_the_author() ); ?>
 				</a>
 			<?php } ?>
 		</div>

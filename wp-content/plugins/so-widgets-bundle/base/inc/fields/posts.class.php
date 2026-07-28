@@ -11,6 +11,21 @@ class SiteOrigin_Widget_Field_Posts extends SiteOrigin_Widget_Field_Container_Ba
 	 */
 	protected $post_types;
 
+	/**
+	 * Whether to show the total number of posts returned by the query or not.
+	 * Enabled by default.
+	 *
+	 * @var bool
+	 */
+	protected $show_count = true;
+
+	/**
+	 * Whether to add the Maximum Posts to Output field.
+	 *
+	 * @var bool
+	 */
+	protected $posts_limit = false;
+
 	public function __construct( $base_name, $element_id, $element_name, $field_options, SiteOrigin_Widget $for_widget, $parent_container = array() ) {
 		parent::__construct( $base_name, $element_id, $element_name, $field_options, $for_widget, $parent_container );
 
@@ -22,7 +37,10 @@ class SiteOrigin_Widget_Field_Posts extends SiteOrigin_Widget_Field_Container_Ba
 		}
 
 		foreach ( $types as $id => $type ) {
-			if ( empty( $this->post_types ) || in_array( $id, $this->post_types ) ) {
+			if (
+				empty( $this->post_types ) ||
+				in_array( $id, $this->post_types )
+			) {
 				$type_options[ $id ] = $type->labels->name;
 			}
 		}
@@ -30,7 +48,7 @@ class SiteOrigin_Widget_Field_Posts extends SiteOrigin_Widget_Field_Container_Ba
 		$this->fields = array(
 			'post_type' => array(
 				'type' => 'select',
-				'label' => __( 'Post type', 'so-widgets-bundle' ),
+				'label' => __( 'Post Type', 'so-widgets-bundle' ),
 				'multiple' => true,
 				'options' => $type_options,
 				'default' => 'post',
@@ -38,7 +56,7 @@ class SiteOrigin_Widget_Field_Posts extends SiteOrigin_Widget_Field_Container_Ba
 
 			'post__in' => array(
 				'type' => 'autocomplete',
-				'label' => __( 'Post in', 'so-widgets-bundle' ),
+				'label' => __( 'Post In', 'so-widgets-bundle' ),
 				'source' => 'posts',
 			),
 
@@ -51,7 +69,7 @@ class SiteOrigin_Widget_Field_Posts extends SiteOrigin_Widget_Field_Container_Ba
 
 			'tax_query_relation' => array(
 				'type' => 'radio',
-				'label' => __( 'Taxonomies relationship', 'so-widgets-bundle' ),
+				'label' => __( 'Taxonomies Relationship', 'so-widgets-bundle' ),
 				'options' => array(
 					'OR' => __( 'OR', 'so-widgets-bundle' ),
 					'AND' => __( 'AND', 'so-widgets-bundle' ),
@@ -62,7 +80,7 @@ class SiteOrigin_Widget_Field_Posts extends SiteOrigin_Widget_Field_Container_Ba
 
 			'date_type' => array(
 				'type' => 'radio',
-				'label' => __( 'Date selection type', 'so-widgets-bundle' ),
+				'label' => __( 'Date Selection Type', 'so-widgets-bundle' ),
 				'options' => array(
 					'specific' => __( 'Specific', 'so-widgets-bundle' ),
 					'relative' => __( 'Relative', 'so-widgets-bundle' ),
@@ -97,7 +115,7 @@ class SiteOrigin_Widget_Field_Posts extends SiteOrigin_Widget_Field_Container_Ba
 
 			'orderby' => array(
 				'type' => 'select',
-				'label' => __( 'Order by', 'so-widgets-bundle' ),
+				'label' => __( 'Order By', 'so-widgets-bundle' ),
 				'options' => array(
 					'none' => __( 'No order', 'so-widgets-bundle' ),
 					'ID' => __( 'Post ID', 'so-widgets-bundle' ),
@@ -118,7 +136,7 @@ class SiteOrigin_Widget_Field_Posts extends SiteOrigin_Widget_Field_Container_Ba
 
 			'order' => array(
 				'type' => 'radio',
-				'label' => __( 'Order direction', 'so-widgets-bundle' ),
+				'label' => __( 'Order Direction', 'so-widgets-bundle' ),
 				'options' => array(
 					'ASC' => __( 'Ascending', 'so-widgets-bundle' ),
 					'DESC' => __( 'Descending', 'so-widgets-bundle' ),
@@ -128,12 +146,17 @@ class SiteOrigin_Widget_Field_Posts extends SiteOrigin_Widget_Field_Container_Ba
 
 			'posts_per_page' => array(
 				'type' => 'number',
-				'label' => __( 'Posts per page', 'so-widgets-bundle' ),
+				'label' => __( 'Posts Per Page', 'so-widgets-bundle' ),
+			),
+
+			'posts_limit' => array(
+				'type' => 'number',
+				'label' => __( 'Maximum Posts to Output', 'so-widgets-bundle' ),
 			),
 
 			'sticky' => array(
 				'type' => 'select',
-				'label' => __( 'Sticky posts', 'so-widgets-bundle' ),
+				'label' => __( 'Sticky Posts', 'so-widgets-bundle' ),
 				'options' => array(
 					'' => __( 'Default', 'so-widgets-bundle' ),
 					'ignore' => __( 'Ignore sticky', 'so-widgets-bundle' ),
@@ -148,6 +171,10 @@ class SiteOrigin_Widget_Field_Posts extends SiteOrigin_Widget_Field_Container_Ba
 				'description' => __( 'Additional query arguments. See <a href="https://developer.wordpress.org/reference/functions/query_posts/" target="_blank" rel="noopener noreferrer">query_posts</a>.', 'so-widgets-bundle' ),
 			),
 		);
+
+		if ( empty( $this->posts_limit ) ) {
+			unset( $this->fields['posts_limit'] );
+		}
 	}
 
 	protected function render_field_label( $value, $instance ) {
@@ -156,7 +183,12 @@ class SiteOrigin_Widget_Field_Posts extends SiteOrigin_Widget_Field_Container_Ba
 			echo ' siteorigin-widget-section-visible';
 		} ?>">
 			<?php parent::render_field_label( $value, $instance ); ?>
-			<span class="sow-current-count"><?php echo esc_html( siteorigin_widget_post_selector_count_posts( $value ) ); ?></span>
+
+			<?php if ( ! empty( $this->show_count ) ) { ?>
+				<span class="sow-current-count">
+					<?php echo esc_html( siteorigin_widget_post_selector_count_posts( $value ) ); ?>
+				</span>
+			<?php } ?>
 		</div>
 		<?php
 	}
@@ -213,8 +245,23 @@ class SiteOrigin_Widget_Field_Posts extends SiteOrigin_Widget_Field_Container_Ba
 	}
 
 	protected function sanitize_field_input( $value, $instance ) {
-		// Special handling for the 'additional' args field.
-		if ( ! empty( $value['additional'] ) ) {
+		// The stored value is a query string, but the rest of this method
+		// expects the associative array shape. Normalize string input back to
+		// an array (mirroring render_field()) so re-running on stored output is
+		// idempotent and doesn't get wiped to array() by the parent.
+		if ( is_string( $value ) ) {
+			$value = wp_parse_args( $value );
+		}
+
+		// Special handling for the 'additional' args field. Only encode when it
+		// is not already encoded, so re-running on stored output doesn't
+		// double-encode. If decoding the value changes nothing, it wasn't
+		// encoded yet.
+		// Edge case: a fresh value that already contains a literal %XX sequence is
+		// treated as pre-encoded and left as-is. 'additional' holds raw WP_Query
+		// args (orderby=date&meta_key=x), which never contain %XX, so this is
+		// intentional and safe.
+		if ( ! empty( $value['additional'] ) && urldecode( $value['additional'] ) === $value['additional'] ) {
 			$value['additional'] = urlencode( $value['additional'] );
 		}
 		$value = parent::sanitize_field_input( $value, $instance );

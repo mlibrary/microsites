@@ -1,11 +1,11 @@
 <?php
-
 /*
 Widget Name: Price Table
 Description: Display pricing plans in a professional table format with custom columns, features, and design.
 Author: SiteOrigin
 Author URI: https://siteorigin.com
 Documentation: https://siteorigin.com/widgets-bundle/price-table-widget/
+Keywords: feature, plans, tier
 */
 
 class SiteOrigin_Widget_PriceTable_Widget extends SiteOrigin_Widget {
@@ -277,7 +277,7 @@ class SiteOrigin_Widget_PriceTable_Widget extends SiteOrigin_Widget {
 			$attr_string = '';
 
 			foreach ( $img_attrs as $attr => $val ) {
-				$attr_string .= ' ' . esc_attr( $attr ) . '="' . esc_attr( $val ) . '"';
+				$attr_string .= ' ' . siteorigin_sanitize_attribute_key( $attr ) . '="' . esc_attr( $val ) . '"';
 			}
 			?><img src="<?php echo esc_url( $src[0] ); ?>"<?php echo $attr_string; ?>/> <?php
 		}
@@ -304,12 +304,21 @@ class SiteOrigin_Widget_PriceTable_Widget extends SiteOrigin_Widget {
 			}
 		}
 
+		$button_attrs = array(
+			'class' => 'ow-pt-link',
+		);
+
+		if ( ! empty( $instance['button_new_window'] ) ) {
+			$button_attrs['target'] = '_blank';
+			$button_attrs['rel'] = 'noopener noreferrer';
+		}
+
 		return array(
 			'title'                => $instance['title'],
 			'columns'              => $columns,
 			'before_title'         => $args['before_title'],
 			'after_title'          => $args['after_title'],
-			'button_new_window'    => $instance['button_new_window'],
+			'button_attrs'         => $button_attrs,
 			'equalize_row_heights' => ! empty( $instance['equalize_row_heights'] ),
 			'any_column_has_image' => $any_column_has_image,
 		);

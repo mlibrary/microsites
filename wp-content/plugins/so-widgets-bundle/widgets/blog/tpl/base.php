@@ -1,7 +1,11 @@
 <?php if ( ! empty( $posts ) && $posts->have_posts() ) { ?>
-	<?php
-	if ( ! empty( $instance['title'] ) ) {
-		echo $args['before_title'] . wp_kses_post( $instance['title'] ) . $args['after_title'];
+	<?php if ( ! empty( $instance['title'] ) ) { ?>
+		<div class="sow-blog-title">
+			<?php
+			echo $args['before_title'] . wp_kses_post( $instance['title'] ) . $args['after_title'];
+			?>
+		</div>
+		<?php
 	}
 
 	$this->override_read_more( $settings );
@@ -28,9 +32,12 @@
 				<button data-filter="*" class="active" style="background: none; margin-right: 34px; padding: 0 0 6px;">
 					<?php esc_html_e( 'All', 'so-widgets-bundle' ); ?>
 				</button>
-				<?php foreach ( $template_settings['terms'] as $tax_term ) { ?>
-					<button data-filter=".<?php echo esc_attr( $tax_term->slug ); ?>" style="background: none; box-shadow: none; margin-right: 34px; padding: 0 0 6px;">
-						<?php echo esc_html( $tax_term->slug ); ?>
+				<?php
+				foreach ( $template_settings['terms'] as $tax_term ) {
+					$slug = is_object( $tax_term ) ? $tax_term->slug : $tax_term;
+					?>
+					<button data-filter=".<?php echo esc_attr( $slug ); ?>" style="background: none; box-shadow: none; margin-right: 34px; padding: 0 0 6px;">
+						<?php echo esc_html( $slug ); ?>
 					</button>
 				<?php } ?>
 			</div>

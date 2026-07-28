@@ -3,7 +3,7 @@
 Plugin Name: Page Builder by SiteOrigin
 Plugin URI: https://siteorigin.com/page-builder/
 Description: A drag and drop, responsive page builder that simplifies building your website.
-Version: 2.29.15
+Version: 2.35.0
 Author: SiteOrigin
 Author URI: https://siteorigin.com
 License: GPL3
@@ -11,7 +11,7 @@ License URI: http://www.gnu.org/licenses/gpl.html
 Donate link: https://siteorigin.com/downloads/premium/
 */
 
-define( 'SITEORIGIN_PANELS_VERSION', '2.29.15' );
+define( 'SITEORIGIN_PANELS_VERSION', '2.35.0' );
 
 if ( ! defined( 'SITEORIGIN_PANELS_JS_SUFFIX' ) ) {
 	define( 'SITEORIGIN_PANELS_JS_SUFFIX', '.min' );
@@ -75,7 +75,6 @@ class SiteOrigin_Panels {
 
 		// We need to generate fresh post content.
 		add_filter( 'the_content', array( $this, 'generate_post_content' ) );
-		add_filter( 'woocommerce_format_content', array( $this, 'generate_woocommerce_content' ) );
 		add_filter( 'wp_enqueue_scripts', array( $this, 'generate_post_css' ) );
 
 		// Remove the default excerpt function.
@@ -126,7 +125,7 @@ class SiteOrigin_Panels {
 	}
 
 	public static function is_legacy_browser() {
-		$agent = ! empty( $_SERVER['HTTP_USER_AGENT'] ) ? $_SERVER['HTTP_USER_AGENT'] : '';
+		$agent = ! empty( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '';
 
 		if ( empty( $agent ) ) {
 			return false;
@@ -300,21 +299,6 @@ class SiteOrigin_Panels {
 	}
 
 	/**
-	 * Generate post content for WooCommerce shop page if it's using a PB layout.
-	 *
-	 * @return string
-	 *
-	 * @filter woocommerce_format_content
-	 */
-	public function generate_woocommerce_content( $content ) {
-		if ( class_exists( 'WooCommerce' ) && is_shop() ) {
-			return $this->generate_post_content( $content );
-		}
-
-		return $content;
-	}
-
-	/**
 	 * Generate post content for the current post.
 	 *
 	 * @return string
@@ -333,14 +317,19 @@ class SiteOrigin_Panels {
 		}
 
 		$post_id = $this->get_post_id();
-
 		// Check if this post has panels_data.
 		if ( get_post_meta( $post_id, 'panels_data', true ) ) {
+			$original_post = $post;
+
 			$panel_content = SiteOrigin_Panels::renderer()->render(
 				$post_id,
 				// Add CSS if this is not the main single post, this is handled by add_single_css.
 				$preview || $post_id !== get_queried_object_id()
 			);
+
+			// Some widgets call wp_reset_postdata() while rendering and can alter global $post.
+			// Restore it so downstream the_content filters still receive the current post context.
+			$post = $original_post;
 
 			if ( ! empty( $panel_content ) ) {
 				$content = $panel_content;
@@ -464,7 +453,7 @@ class SiteOrigin_Panels {
 		// From the core `wp_trim_words` function to get localized word count.
 		$text = wp_strip_all_tags( $text );
 
-		if ( strpos( _x( 'words', 'Word count type. Do not translate!' ), 'characters' ) === 0 && preg_match( '/^utf\-?8$/i', get_option( 'blog_charset' ) ) ) {
+		if ( strpos( _x( 'words', 'Word count type. Do not translate!', 'siteorigin-panels' ), 'characters' ) === 0 && preg_match( '/^utf\-?8$/i', get_option( 'blog_charset' ) ) ) {
 			$text = trim( preg_replace( "/[\n\r\t ]+/", ' ', $text ), ' ' );
 			preg_match_all( '/./u', $text, $words_array );
 			$words_array = $words_array[0];
@@ -493,7 +482,7 @@ class SiteOrigin_Panels {
 	public function get_post_id() {
 		$post_id = get_the_ID();
 
-		if ( class_exists( 'WooCommerce' ) && is_shop() ) {
+		if ( SiteOrigin_Panels_Compat_WooCommerce::should_use_shop_page_id() ) {
 			$post_id = wc_get_page_id( 'shop' );
 		}
 		global $preview;
@@ -682,6 +671,9 @@ class SiteOrigin_Panels {
 		if ( empty( $active_version ) || $active_version !== SITEORIGIN_PANELS_VERSION ) {
 			do_action( 'siteorigin_panels_version_changed' );
 			update_option( 'siteorigin_panels_active_version', SITEORIGIN_PANELS_VERSION );
+
+			// Clear layout directory cache after update to account for bug in versions 2.29.18 and below.
+			delete_transient( 'siteorigin_panels_layouts_directory_siteorigin_page_2' );
 		}
 	}
 

@@ -5,6 +5,7 @@ Description: Design responsive slider frames with unique layouts, backgrounds, a
 Author: SiteOrigin
 Author URI: https://siteorigin.com
 Documentation: https://siteorigin.com/widgets-bundle/layout-slider-widget/
+Keywords: background, button, column, content, image, layout, rows, video, widget
 */
 
 if ( ! class_exists( 'SiteOrigin_Widget_Base_Slider' ) ) {
@@ -33,6 +34,9 @@ class SiteOrigin_Widget_LayoutSlider_Widget extends SiteOrigin_Widget_Base_Slide
 
 	public function get_widget_form() {
 		$show_heading_fields = apply_filters( 'sow_layout_slider_show_heading_fields', false );
+
+		$units = siteorigin_widgets_get_measurements_list();
+		unset( $units[1] ); // Remove %;
 
 		return parent::widget_form( array(
 			'frames' => array(
@@ -77,16 +81,37 @@ class SiteOrigin_Widget_LayoutSlider_Widget extends SiteOrigin_Widget_Base_Slide
 								'label' => __( 'Background image', 'so-widgets-bundle' ),
 								'library' => 'image',
 								'fallback' => true,
+								'state_emitter' => array(
+									'callback' => 'conditional',
+									'args'     => array(
+										'has_background_image[show]: val',
+										'has_background_image[hide]: ! val',
+									),
+								),
+							),
+
+							'alt' => array(
+								'type' => 'text',
+								'label' => __( 'Image Alt Text', 'so-widgets-bundle' ),
+								'description' => __( 'Leave empty for decorative images.', 'so-widgets-bundle' ),
+								'state_handler' => array(
+									'has_background_image[show]' => array( 'show' ),
+									'has_background_image[hide]' => array( 'hide' ),
+								),
 							),
 
 							'image_type' => array(
 								'type' => 'select',
 								'label' => __( 'Background image type', 'so-widgets-bundle' ),
 								'options' => array(
-									'cover' => __( 'Cover', 'so-widgets-bundle ' ),
+									'cover' => __( 'Cover', 'so-widgets-bundle' ),
 									'tile' => __( 'Tile', 'so-widgets-bundle' ),
 								),
 								'default' => 'cover',
+								'state_handler' => array(
+									'has_background_image[show]' => array( 'show' ),
+									'has_background_image[hide]' => array( 'hide' ),
+								),
 							),
 
 							'opacity' => array(
@@ -95,6 +120,10 @@ class SiteOrigin_Widget_LayoutSlider_Widget extends SiteOrigin_Widget_Base_Slide
 								'min' => 0,
 								'max' => 100,
 								'default' => 100,
+								'state_handler' => array(
+									'has_background_image[show]' => array( 'show' ),
+									'has_background_image[hide]' => array( 'hide' ),
+								),
 							),
 
 							'color' => array(
@@ -154,6 +183,7 @@ class SiteOrigin_Widget_LayoutSlider_Widget extends SiteOrigin_Widget_Base_Slide
 							'height' => array(
 								'type' => 'measurement',
 								'label' => __( 'Height', 'so-widgets-bundle' ),
+								'units' => $units,
 							),
 
 							'padding' => array(
@@ -189,6 +219,7 @@ class SiteOrigin_Widget_LayoutSlider_Widget extends SiteOrigin_Widget_Base_Slide
 							'height_responsive' => array(
 								'type' => 'measurement',
 								'label' => __( 'Height', 'so-widgets-bundle' ),
+								'units' => $units,
 							),
 
 							'padding' => array(
@@ -255,17 +286,41 @@ class SiteOrigin_Widget_LayoutSlider_Widget extends SiteOrigin_Widget_Base_Slide
 		) );
 	}
 
-	public function form( $instance, $form_type = 'widget' ) {
-		if ( ( is_admin() || ( defined( 'REST_REQUEST' ) && function_exists( 'register_block_type' ) ) ) && defined( 'SITEORIGIN_PANELS_VERSION' ) ) {
-			parent::form( $instance, $form_type );
-		} else {
-			?>
-			<p>
-				<?php _e( 'This widget requires: ', 'so-widgets-bundle' ); ?>
-				<a href="https://siteorigin.com/page-builder/" target="_blank" rel="noopener noreferrer"><?php _e( 'SiteOrigin Page Builder', 'so-widgets-bundle' ); ?></a>
-			</p>
-			<?php
+
+	private static function can_render() {
+		if ( ! defined( 'SITEORIGIN_PANELS_VERSION' ) ) {
+			return false;
 		}
+
+		if ( is_admin() ) {
+			return true;
+		}
+
+		// Is this field being rendered inside one of our blocks?
+		if ( defined( 'REST_REQUEST' ) && function_exists( 'register_block_type' ) ) {
+			return true;
+		}
+
+		return false;
+	}
+
+	public function form( $instance, $form_type = 'widget' ) {
+		if ( siteorigin_widgets_can_render_builder_field() ) {
+			parent::form( $instance, $form_type );
+			return;
+		}
+		?>
+
+		<p>
+			<?php
+			printf(
+				esc_html__( 'This widget requires %sSiteOrigin Page Builder%s to be installed and activated.', 'so-widgets-bundle' ),
+				'<a href="https://siteorigin.com/page-builder/" target="_blank" rel="noopener noreferrer">',
+				'</a>'
+			);
+			?>
+		</p>
+		<?php
 	}
 
 	/**
@@ -283,6 +338,7 @@ class SiteOrigin_Widget_LayoutSlider_Widget extends SiteOrigin_Widget_Base_Slide
 		return array(
 			'color' => ! empty( $frame['background']['color'] ) ? $frame['background']['color'] : false,
 			'image' => ! empty( $background_image[0] ) ? $background_image[0] : false,
+			'image-alt' => ! empty( $frame['background']['alt'] ) ? $frame['background']['alt'] : '',
 			'image-width' => ! empty( $background_image[1] ) ? $background_image[1] : 0,
 			'image-height' => ! empty( $background_image[2] ) ? $background_image[2] : 0,
 			'image-sizing' => $frame['background']['image_type'],
@@ -396,7 +452,7 @@ class SiteOrigin_Widget_LayoutSlider_Widget extends SiteOrigin_Widget_Base_Slide
 			if ( ! empty( $instance['layout']['desktop'] ) ) {
 				$settings = $instance['layout']['desktop'];
 
-				$meas_options['slide_height'] = ! empty( $settings['height'] ) ? $settings['height'] : '';
+				$meas_options['slide_height'] = ( ! empty( $settings['height'] ) && (float) $settings['height'] != 0 ) ? $settings['height'] : '';
 				$meas_options['slide_padding'] = ! empty( $settings['padding'] ) ? $settings['padding'] : '';
 				$meas_options['slide_padding_extra_top'] = ! empty( $settings['padding_extra_top'] ) ? $settings['padding_extra_top'] : '';
 				$meas_options['slide_padding_sides'] = ! empty( $settings['padding_sides'] ) ? $settings['padding_sides'] : '';
@@ -406,7 +462,7 @@ class SiteOrigin_Widget_LayoutSlider_Widget extends SiteOrigin_Widget_Base_Slide
 			if ( ! empty( $instance['layout']['mobile'] ) ) {
 				$settings = $instance['layout']['mobile'];
 
-				$meas_options['slide_height_responsive'] = ! empty( $settings['height_responsive'] ) ? $settings['height_responsive'] : '';
+				$meas_options['slide_height_responsive'] = ( ! empty( $settings['height_responsive'] ) && (float) $settings['height_responsive'] != 0 ) ? $settings['height_responsive'] : '';
 				$meas_options['slide_padding_responsive'] = ! empty( $settings['padding'] ) ? $settings['padding'] : '';
 				$meas_options['slide_padding_sides_responsive'] = ! empty( $settings['padding_sides'] ) ? $settings['padding_sides'] : '';
 

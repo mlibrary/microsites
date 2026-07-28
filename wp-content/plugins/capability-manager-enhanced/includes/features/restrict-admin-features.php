@@ -12,16 +12,48 @@ class PP_Capabilities_Admin_Features
     {
         $elements = [];
 
-        //Add header and footer
-        $elements[esc_html__('Header and Footer', 'capsman-enhanced')] = self::formatHeaderFooter();
-
         //Add toolbar
-        $elements[esc_html__('Admin Toolbar', 'capsman-enhanced')] = self::formatAdminToolbar();
+        $elements['Admin Toolbar'] = self::formatAdminToolbar();
+
+        //Add header and footer
+        $elements['Header and Footer'] = self::formatHeaderFooter();
 
         //Add dashboard widget
-        $elements[esc_html__('Dashboard widgets', 'capsman-enhanced')] = self::formatDashboardWidgets();
+        $elements['Dashboard widgets'] = self::formatDashboardWidgets();
 
         return apply_filters('pp_capabilities_admin_features_elements', $elements);
+    }
+
+    /**
+     * Retrieve all items title.
+     *
+     * @return array Items titles.
+     */
+    public static function elementLayoutItemTitles()
+    {
+        $titles = [];
+
+        $titles['Header and Footer']    = esc_html__('Hide Default Items', 'capability-manager-enhanced');
+        $titles['Admin Toolbar']        = esc_html__('Hide Admin Toolbar', 'capability-manager-enhanced');
+        $titles['Dashboard widgets']    = esc_html__('Hide Dashboard Widgets', 'capability-manager-enhanced');
+
+        return apply_filters('pp_capabilities_admin_features_titles', $titles);
+    }
+
+    /**
+     * Retrieve all items action.
+     *
+     * @return array Items action.
+     */
+    public static function elementLayoutItemActions()
+    {
+        $actions = [];
+
+        $actions['Header and Footer']    = 'ppc_header_footer';
+        $actions['Admin Toolbar']        = 'ppc_adminbar';
+        $actions['Dashboard widgets']    = 'ppc_dashboard_widget';
+
+        return apply_filters('pp_capabilities_admin_features_actions', $actions);
     }
 
     /**
@@ -56,19 +88,93 @@ class PP_Capabilities_Admin_Features
     {
         $title = [];
 
-        $title['menu-toggle']      = esc_html__('Mobile Menu Toggle', 'capsman-enhanced');
-        $title['wp-logo']          = esc_html__('WordPress Logo', 'capsman-enhanced');
-        $title['wp-logo-external'] = esc_html__('WordPress External Links', 'capsman-enhanced');
-        $title['updates']          = esc_html__('Updates', 'capsman-enhanced');
-        $title['comments']         = esc_html__('Comments', 'capsman-enhanced');
-        $title['top-secondary']    = esc_html__('Right bar', 'capsman-enhanced');
-        $title['user-actions']     = esc_html__('User actions', 'capsman-enhanced');
-        $title['new-content']      = esc_html__('New', 'capsman-enhanced');
-        $title['new-content']      = esc_html__('New', 'capsman-enhanced');
-        $title['user-info']        = esc_html__('User Display Name', 'capsman-enhanced');
-        $title['wpseo-menu']       = esc_html__('Yoast SEO', 'capsman-enhanced');
+        $title['menu-toggle']      = esc_html__('Mobile Menu Toggle', 'capability-manager-enhanced');
+        $title['wp-logo']          = esc_html__('WordPress Logo', 'capability-manager-enhanced');
+        $title['wp-logo-external'] = esc_html__('WordPress External Links', 'capability-manager-enhanced');
+        $title['updates']          = esc_html__('Updates');
+        $title['comments']         = esc_html__('Comments');
+        $title['top-secondary']    = esc_html__('Right bar', 'capability-manager-enhanced');
+        $title['user-actions']     = esc_html__('User actions', 'capability-manager-enhanced');
+        $title['new-content']      = esc_html__('New', 'capability-manager-enhanced');
+        $title['new-content']      = esc_html__('New', 'capability-manager-enhanced');
+        $title['user-info']        = esc_html__('User Display Name', 'capability-manager-enhanced');
+        $title['wpseo-menu']       = esc_html__('Yoast SEO', 'capability-manager-enhanced');
+        $title['edit']             = esc_html__('Edit Post', 'capability-manager-enhanced');
+        $title['site-editor']      = esc_html__('Edit Site', 'capability-manager-enhanced');
 
         return isset($title[$id]) ? $title[$id] : $id;
+    }
+
+    /**
+     * Add fallback toolbar entries for dynamic frontend links.
+     *
+     * @return void
+     */
+    private static function addDynamicToolbarFallbacks()
+    {
+        global $toolbar_items;
+
+        if (!is_array($toolbar_items)) {
+            $toolbar_items = [];
+        }
+
+        $fallback_items = [
+            'edit' => [
+                'label'    => self::elementToolbarTitleFallback('edit'),
+                'parent'   => '',
+                'step'     => 1,
+                'position' => 0,
+                'action'   => 'ppc_adminbar'
+            ],
+            'site-editor' => [
+                'label'    => self::elementToolbarTitleFallback('site-editor'),
+                'parent'   => '',
+                'step'     => 1,
+                'position' => 0,
+                'action'   => 'ppc_adminbar'
+            ],
+        ];
+
+        // Keep existing runtime entries untouched; only inject missing dynamic items.
+        foreach ($fallback_items as $id => $item) {
+            if (!isset($toolbar_items[$id])) {
+                $fallback_items[$id]['position'] = !empty($toolbar_items['new-content']['position'])
+                    ? ((int)$toolbar_items['new-content']['position'] + 1)
+                    : 999999998;
+                $fallback_items[$id]['step'] = !empty($toolbar_items['new-content']['step'])
+                    ? (int)$toolbar_items['new-content']['step']
+                    : 1;
+            } else {
+                unset($fallback_items[$id]);
+            }
+        }
+
+        if (empty($fallback_items)) {
+            return;
+        }
+
+        // Insert right after + New when available, otherwise append.
+        $ordered_items = [];
+        $inserted = false;
+
+        foreach ($toolbar_items as $id => $item) {
+            $ordered_items[$id] = $item;
+
+            if ('new-content' === $id) {
+                foreach ($fallback_items as $fallback_id => $fallback_item) {
+                    $ordered_items[$fallback_id] = $fallback_item;
+                }
+                $inserted = true;
+            }
+        }
+
+        if (!$inserted) {
+            foreach ($fallback_items as $fallback_id => $fallback_item) {
+                $ordered_items[$fallback_id] = $fallback_item;
+            }
+        }
+
+        $toolbar_items = $ordered_items;
     }
 
     /**
@@ -78,10 +184,10 @@ class PP_Capabilities_Admin_Features
      */
     public static function formatHeaderFooter()
     {
-        $elements_item['screen_options'] = ['label'  => esc_html__('Screen Options', 'capsman-enhanced'), 'action' => 'ppc_header_footer'];
-        $elements_item['screen_help'] = ['label'  => esc_html__('Help', 'capsman-enhanced'), 'action' => 'ppc_header_footer'];
-        $elements_item['footer_thankyou'] = ['label'  => esc_html__('Thank you for creating with WordPress', 'capsman-enhanced'), 'action' => 'ppc_header_footer'];
-        $elements_item['footer_upgrade'] = ['label'  => sprintf( esc_html__( 'Version %s' ), get_bloginfo('version'), 'capsman-enhanced' ), 'action' => 'ppc_header_footer'];
+        $elements_item['screen_options'] = ['label'  => esc_html__('Screen Options'), 'action' => 'ppc_header_footer'];
+        $elements_item['screen_help'] = ['label'  => esc_html__('Help'), 'action' => 'ppc_header_footer'];
+        $elements_item['footer_thankyou'] = ['label'  => esc_html__('Thank you for creating with WordPress', 'capability-manager-enhanced'), 'action' => 'ppc_header_footer'];
+        $elements_item['footer_upgrade'] = ['label'  => sprintf( esc_html__( 'Version %s' ), get_bloginfo('version'), 'capability-manager-enhanced' ), 'action' => 'ppc_header_footer'];
 
         return $elements_item;
     }
@@ -130,7 +236,7 @@ class PP_Capabilities_Admin_Features
 
         $elements_widget = [];
         //add widget that may not be part of wp_meta_boxes
-        $elements_widget['dashboard_welcome_panel'] = ['label'  => esc_html__('Welcome panel', 'capsman-enhanced'), 'context' => 'normal', 'action' => 'ppc_dashboard_widget'];
+        $elements_widget['dashboard_welcome_panel'] = ['label'  => esc_html__('Welcome panel', 'capability-manager-enhanced'), 'context' => 'normal', 'action' => 'ppc_dashboard_widget'];
         //loop other widgets
         foreach ($widgets as $context => $priority) {
             foreach ($priority as $data) {
@@ -155,10 +261,27 @@ class PP_Capabilities_Admin_Features
     {
         global $toolbar_items;
 
+        if (function_exists('ppc_features_get_admin_bar_nodes')) {
+            ppc_features_get_admin_bar_nodes();
+        }
+
+        if (!is_array($toolbar_items)) {
+            $toolbar_items = [];
+        }
+
+        $toolbar_items['admintoolbar'] = [
+            'label'    => esc_html__('Remove Admin Toolbar', 'capability-manager-enhanced'),
+            'parent'   => '',
+            'step'     => 999999999999,
+            'position' => 999999999999,
+            'action'   => 'ppc_adminbar'
+        ];
+
         $toolbars    = (array)$GLOBALS['ppcAdminBar'];
         $toolbarTree = self::formatAdminToolbarTree($toolbars);
         //set toolbar element with steps
         self::setAdminToolbarElement($toolbarTree);
+        self::addDynamicToolbarFallbacks();
 
         return $toolbar_items;
     }
@@ -192,6 +315,10 @@ class PP_Capabilities_Admin_Features
     public static function setAdminToolbarElement(array $toolbarTrees, $steps = 1, $step_list = [])
     {
         global $toolbar_items;
+
+        if (!is_array($toolbar_items)) {
+            $toolbar_items = [];
+        }
 
         $position = 0;
         foreach ($toolbarTrees as $toolbarTree) {
@@ -236,22 +363,28 @@ class PP_Capabilities_Admin_Features
 
     /**
      * Get array elements that starts with a specific word
-	 * 
-	 * @param array $restricted_features All restricted elements to check agains.
-	 * @param string $start_with The word to look for in array.
-	 * 
+     *
+     * @param array $restricted_features All restricted elements to check agains.
+     * @param string $start_with The word to look for in array.
+     *
      * @return array Filtered array.
      */
     public static function adminFeaturesRestrictedElements($restricted_elements, $start_with = 'ppc_adminbar')
     {
-		//get all items of the array starting with the specified string.  
-		$new_elements = array_filter( 
-			$restricted_elements,
-			function($value, $key) use ($start_with) {return strpos($value, $start_with) === 0;}, ARRAY_FILTER_USE_BOTH
-		);
+        if (empty($start_with)) {
+            return $restricted_elements;
+        }
 
-		return $new_elements;
-	}
+        $new_elements = array_filter(
+            $restricted_elements,
+            function($value, $key) use ($start_with) {
+                return strpos($value, $start_with) === 0;
+            },
+            ARRAY_FILTER_USE_BOTH
+        );
+
+        return $new_elements;
+    }
 
 
     /**
@@ -260,7 +393,7 @@ class PP_Capabilities_Admin_Features
     public static function adminFeaturedRestriction()
     {
 		global $ppc_disabled_toolbar, $ppc_disabled_widget;
-        
+
         if (is_multisite() && is_super_admin() && !defined('PP_CAPABILITIES_RESTRICT_SUPER_ADMIN')) {
             return;
         }
@@ -277,9 +410,16 @@ class PP_Capabilities_Admin_Features
             }
         }
 
-		//merge all array values incase it's more than role
-        //$all_disabled_elements = array_merge(...$all_disabled_elements);  // This is a PHP 7.4 operator
-        $all_disabled_elements = (is_array($all_disabled_elements) && isset($all_disabled_elements[0])) ? array_merge($all_disabled_elements[0]) : [];
+        if (is_array($all_disabled_elements) && !empty($all_disabled_elements)) {
+            $all_disabled_elements = array_filter($all_disabled_elements, 'is_array');
+            if (!empty($all_disabled_elements)) {
+                $all_disabled_elements = call_user_func_array('array_merge', $all_disabled_elements);
+            } else {
+                $all_disabled_elements = [];
+            }
+        } else {
+            $all_disabled_elements = [];
+        }
 
         do_action('ppc_admin_feature_restriction', $all_disabled_elements);
 
@@ -292,14 +432,14 @@ class PP_Capabilities_Admin_Features
                 //backend admin tool bar
                 add_action('admin_head', [__CLASS__, 'disableDashboardBarBackend']);
             } else {
-			    add_action( 'wp_before_admin_bar_render', [ __CLASS__, 'disableDashboardBar' ], 99 );
+                add_action( 'wp_before_admin_bar_render', [ __CLASS__, 'disableDashboardBar' ], 9999 );
             }
 		}
 
 		if(is_admin()){
 			$ppc_disabled_widget = self::adminFeaturesRestrictedElements($all_disabled_elements, 'ppc_dashboard_widget');
 			$ppc_header_footer   = self::adminFeaturesRestrictedElements($all_disabled_elements, 'ppc_header_footer');
-            
+
 			//disable widget
 			if(count($ppc_disabled_widget) > 0){
 				add_action( 'wp_dashboard_setup', [ __CLASS__, 'disableDashboardWidgets' ], 99 );
@@ -325,7 +465,7 @@ class PP_Capabilities_Admin_Features
             add_action('admin_head', [__CLASS__, 'contextual_help_list_remove'], 999);
         }
         if(in_array('ppc_header_footer||footer_thankyou', $ppc_header_footer)){
-            add_filter( 'admin_footer_text', '__return_false', 999 );
+            add_filter( 'admin_footer_text', '__return_empty_string', 999 );
         }
         if(in_array('ppc_header_footer||footer_upgrade', $ppc_header_footer)){
             add_filter( 'update_footer', '__return_false', 999 );
@@ -378,7 +518,7 @@ class PP_Capabilities_Admin_Features
 	 */
 	public static function disableDashboardWidgets() {
 		global $ppc_disabled_widget;
-		
+
 		$widgets = (array)$ppc_disabled_widget;
 
 		if ( count($widgets) === 0 ) {

@@ -2,7 +2,7 @@
 /*
 Plugin Name: SiteOrigin Widgets Bundle
 Description: A highly customizable collection of widgets, ready to be used anywhere, neatly bundled into a single plugin.
-Version: 1.60.0
+Version: 1.74.2
 Text Domain: so-widgets-bundle
 Domain Path: /lang
 Author: SiteOrigin
@@ -12,7 +12,7 @@ License: GPL3
 License URI: https://www.gnu.org/licenses/gpl-3.0.txt
 */
 
-define( 'SOW_BUNDLE_VERSION', '1.60.0' );
+define( 'SOW_BUNDLE_VERSION', '1.74.2' );
 define( 'SOW_BUNDLE_BASE_FILE', __FILE__ );
 
 // Allow JS suffix to be pre-set.
@@ -49,7 +49,7 @@ class SiteOrigin_Widgets_Bundle {
 		add_action( 'admin_menu', array( $this, 'admin_menu_init' ) );
 		add_action( 'admin_init', array( $this, 'clear_file_cache' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'admin_enqueue_scripts' ) );
-		add_action( 'admin_enqueue_scripts', array( $this, 'admin_register_scripts' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'admin_register_scripts' ), 20, 1 );
 
 		// All the Ajax actions.
 		add_action( 'wp_ajax_so_widgets_bundle_manage', array( $this, 'admin_ajax_manage_handler' ) );
@@ -59,7 +59,7 @@ class SiteOrigin_Widgets_Bundle {
 		add_action( 'wp_ajax_so_widgets_setting_save', array( $this, 'admin_ajax_settings_save' ) );
 
 		// Initialize the widgets, but do it fairly late.
-		add_action( 'plugins_loaded', array( $this, 'set_plugin_textdomain' ), 1 );
+		add_action( 'init', array( $this, 'set_plugin_textdomain' ), 10, 0 );
 		add_action( 'after_setup_theme', array( $this, 'get_widget_folders' ), 11 );
 		add_action( 'after_setup_theme', array( $this, 'load_widget_plugins' ), 11 );
 
@@ -79,7 +79,7 @@ class SiteOrigin_Widgets_Bundle {
 		add_filter( 'siteorigin_panels_prebuilt_layout', array( $this, 'load_missing_widgets' ) );
 		add_filter( 'siteorigin_panels_widget_object', array( $this, 'load_missing_widget' ), 10, 2 );
 
-		add_filter( 'wp_enqueue_scripts', array( $this, 'register_general_scripts' ) );
+		add_filter( 'wp_enqueue_scripts', array( $this, 'register_general_scripts' ), 20, 1 );
 		add_filter( 'wp_enqueue_scripts', array( $this, 'enqueue_active_widgets_scripts' ) );
 
 		// Add compatibility for Autoptimize.
@@ -250,6 +250,11 @@ class SiteOrigin_Widgets_Bundle {
 
 		if ( empty( $active_widgets ) ) {
 			$active_widgets = get_option( 'siteorigin_widgets_active', array() );
+			
+			if ( ! is_array( $active_widgets ) ) {
+				$active_widgets = array();
+			}
+			
 			$active_widgets = wp_parse_args( $active_widgets, apply_filters( 'siteorigin_widgets_default_active', self::$default_active_widgets ) );
 
 			// Migrate any old names.
@@ -396,17 +401,24 @@ class SiteOrigin_Widgets_Bundle {
 			plugin_dir_url( __FILE__ ) . 'js/lib/pikaday.css'
 		);
 
-		wp_register_script(
-			'select2',
-			plugin_dir_url( SOW_BUNDLE_BASE_FILE ) . 'js/lib/select2' . SOW_BUNDLE_JS_SUFFIX . '.js',
-			array( 'jquery' ),
-			'4.1.0-rc.0'
-		);
 
-		wp_register_style(
-			'select2',
-			plugin_dir_url( __FILE__ ) . 'css/lib/select2.css'
-		);
+		if (
+			! wp_script_is( 'select2', 'registered' ) &&
+			! wp_script_is( 'select2', 'enqueued' )
+		) {
+			wp_register_script(
+				'select2',
+				plugin_dir_url( SOW_BUNDLE_BASE_FILE ) . 'js/lib/select2' . SOW_BUNDLE_JS_SUFFIX . '.js',
+				array( 'jquery' ),
+				'4.1.0-rc.0'
+			);
+
+			wp_register_style(
+				'select2',
+				plugin_dir_url( __FILE__ ) . 'css/lib/select2.css'
+			);
+		}
+
 	}
 
 	/**
@@ -453,7 +465,9 @@ class SiteOrigin_Widgets_Bundle {
 
 		$widget_objects = $this->get_widget_objects();
 
-		$widget_path = empty( $_GET['id'] ) ? false : wp_normalize_path( WP_CONTENT_DIR ) . $_GET['id'];
+		$widget_path = empty( $_GET['id'] ) ?
+			false :
+			wp_normalize_path( WP_PLUGIN_DIR ) . sanitize_text_field( $_GET['id'] );
 
 		$widget_object = empty( $widget_objects[ $widget_path ] ) ? false : $widget_objects[ $widget_path ];
 
@@ -496,7 +510,10 @@ class SiteOrigin_Widgets_Bundle {
 		}
 
 		$widget_objects = $this->get_widget_objects();
-		$widget_path = empty( $_GET['id'] ) ? false : wp_normalize_path( WP_CONTENT_DIR ) . $_GET['id'];
+		$widget_path = empty( $_GET['id'] ) ?
+			false :
+			wp_normalize_path( WP_PLUGIN_DIR ) . sanitize_text_field( $_GET['id'] );
+
 		$widget_object = empty( $widget_objects[ $widget_path ] ) ? false : $widget_objects[ $widget_path ];
 
 		if ( empty( $widget_object ) || ! $widget_object->has_form( 'settings' ) ) {
@@ -565,10 +582,7 @@ class SiteOrigin_Widgets_Bundle {
 	 * Get JavaScript variables for admin.
 	 */
 	public function admin_ajax_get_javascript_variables() {
-		if ( empty( $_REQUEST['_widgets_nonce'] ) ||
-			! wp_verify_nonce( $_REQUEST['_widgets_nonce'], 'widgets_action' ) ) {
-			wp_die( __( 'Invalid request.', 'so-widgets-bundle' ), 403 );
-		}
+		siteorigin_verify_request_permissions();
 
 		$widget_class = $_POST['widget'];
 		global $wp_widget_factory;
@@ -700,6 +714,8 @@ class SiteOrigin_Widgets_Bundle {
 			'WidgetURI' => 'Widget URI',
 			'VideoURI' => 'Video URI',
 			'Documentation' => 'Documentation',
+			'HideActivate' => 'Hide Activate',
+			'Keywords' => 'Keywords',
 		);
 
 		$widgets = array();
@@ -724,6 +740,7 @@ class SiteOrigin_Widgets_Bundle {
 				$widget['ID'] = $id;
 				$widget['Active'] = ! empty( $active[ $id ] );
 				$widget['File'] = $file;
+				$widget['HideActivate'] = ! empty( $widget['HideActivate'] );
 
 				$widgets[ $file ] = $widget;
 			}
@@ -847,6 +864,13 @@ class SiteOrigin_Widgets_Bundle {
 	}
 
 	public function register_general_scripts() {
+		wp_register_style(
+			'siteorigin-accessibility',
+			plugin_dir_url( SOW_BUNDLE_BASE_FILE ) . 'css/accessibility.css',
+			array(),
+			SOW_BUNDLE_VERSION
+		);
+
 		wp_register_script(
 			'sowb-fittext',
 			plugin_dir_url( SOW_BUNDLE_BASE_FILE ) . 'js/sow.jquery.fittext' . SOW_BUNDLE_JS_SUFFIX . '.js',
@@ -878,6 +902,16 @@ class SiteOrigin_Widgets_Bundle {
 			SOW_BUNDLE_VERSION
 		);
 
+		wp_localize_script(
+			'sow-google-map',
+			'soWidgetsGoogleMap',
+			array(
+				'geocode' => array(
+					'noResults' => __( 'There were no results for the place you entered. Please try another.', 'so-widgets-bundle' ),
+				),
+			)
+		);
+
 		wp_register_script(
 			'sowb-pikaday',
 			plugin_dir_url( SOW_BUNDLE_BASE_FILE ) . 'js/lib/pikaday' . SOW_BUNDLE_JS_SUFFIX . '.js',
@@ -904,17 +938,22 @@ class SiteOrigin_Widgets_Bundle {
 			1.1
 		);
 
-		wp_register_script(
-			'select2',
-			plugin_dir_url( SOW_BUNDLE_BASE_FILE ) . 'js/lib/select2' . SOW_BUNDLE_JS_SUFFIX . '.js',
-			array( 'jquery' ),
-			'4.1.0-rc.0'
-		);
+		if (
+			! wp_script_is( 'select2', 'registered' ) &&
+			! wp_script_is( 'select2', 'enqueued' )
+		) {
+			wp_register_script(
+				'select2',
+				plugin_dir_url( SOW_BUNDLE_BASE_FILE ) . 'js/lib/select2' . SOW_BUNDLE_JS_SUFFIX . '.js',
+				array( 'jquery' ),
+				'4.1.0-rc.0'
+			);
 
-		wp_register_style(
-			'select2',
-			plugin_dir_url( __FILE__ ) . 'css/lib/select2.css'
-		);
+			wp_register_style(
+				'select2',
+				plugin_dir_url( __FILE__ ) . 'css/lib/select2.css'
+			);
+		}
 	}
 
 	/**
@@ -939,7 +978,11 @@ class SiteOrigin_Widgets_Bundle {
 							$opt_wid = get_option( 'widget_' . $widget->id_base );
 							preg_match( '/-([0-9]+$)/', $id, $num_match );
 
-							if ( ! empty( $num_match ) && isset( $num_match[1] ) ) {
+							if (
+								! empty( $num_match ) &&
+								isset( $num_match[1] ) &&
+								isset( $opt_wid[ $num_match[1] ] )
+							) {
 								$widget_instance = $opt_wid[ $num_match[1] ];
 								$widget->enqueue_frontend_scripts( $widget_instance );
 								// TODO: Should be calling modify_instance here before generating the CSS.
@@ -1040,6 +1083,14 @@ class SiteOrigin_Widgets_Bundle {
 // Create the initial single.
 SiteOrigin_Widgets_Bundle::single();
 
-// Initialize the Meta Box Manager.
-global $sow_meta_box_manager;
-$sow_meta_box_manager = SiteOrigin_Widget_Meta_Box_Manager::single();
+// Initialize the Meta Box Manager. This is required to prevent a WP 6.7 notice.
+$sow_meta_box_manager = null;
+function siteorigin_widgets_load_meta_box_manager() {
+	global $sow_meta_box_manager;
+
+	// Confirm we haven't already set up the Meta Box Manager.
+	if ( ! is_a( $sow_meta_box_manager, 'SiteOrigin_Widget_Meta_Box_Manager' ) ) {
+		$sow_meta_box_manager = SiteOrigin_Widget_Meta_Box_Manager::single();
+	}
+}
+add_action( 'init', 'siteorigin_widgets_load_meta_box_manager' );

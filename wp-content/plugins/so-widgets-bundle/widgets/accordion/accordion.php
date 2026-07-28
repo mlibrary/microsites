@@ -5,6 +5,7 @@ Description: Efficiently display content in expandable sections, maximizing spac
 Author: SiteOrigin
 Author URI: https://siteorigin.com
 Documentation: https://siteorigin.com/widgets-bundle/accordion-widget/
+Keywords: collapsible, dropdown, expandable, faq, foldable, hide, read more, readmore, show, show/hide, toggle
 */
 
 class SiteOrigin_Widget_Accordion_Widget extends SiteOrigin_Widget {
@@ -58,7 +59,7 @@ class SiteOrigin_Widget_Accordion_Widget extends SiteOrigin_Widget {
 			'sowAccordion',
 			array(
 				'scrollto_after_change' => ! empty( $global_settings['scrollto_after_change'] ),
-				'scrollto_offset' => (int) apply_filters( 'siteorigin_widgets_accordion_scrollto_offset', 80 ),
+				'scrollto_offset' => (int) apply_filters( 'siteorigin_widgets_accordion_scrollto_offset', 90 ),
 			)
 		);
 	}
@@ -132,6 +133,21 @@ class SiteOrigin_Widget_Accordion_Widget extends SiteOrigin_Widget {
 							'title_hover_color' => array(
 								'type' => 'color',
 								'label' => __( 'Title hover color', 'so-widgets-bundle' ),
+							),
+							'title_tag' => array(
+								'type' => 'select',
+								'label' => __( 'Title HTML Tag', 'so-widgets-bundle' ),
+								'default' => 'div',
+								'options' => array(
+									'h1' => __( 'H1', 'so-widgets-bundle' ),
+									'h2' => __( 'H2', 'so-widgets-bundle' ),
+									'h3' => __( 'H3', 'so-widgets-bundle' ),
+									'h4' => __( 'H4', 'so-widgets-bundle' ),
+									'h5' => __( 'H5', 'so-widgets-bundle' ),
+									'h6' => __( 'H6', 'so-widgets-bundle' ),
+									'p' => __( 'Paragraph', 'so-widgets-bundle' ),
+									'div' => __( 'Div', 'so-widgets-bundle' ),
+								),
 							),
 							'border_color' => array(
 								'type' => 'color',
@@ -211,18 +227,32 @@ class SiteOrigin_Widget_Accordion_Widget extends SiteOrigin_Widget {
 			return array();
 		}
 
+		$title_tag = siteorigin_widget_valid_tag(
+			$instance['design']['heading']['title_tag'] ?? '',
+			'div',
+			array( 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'div' )
+		);
+		$title_level = 2;
+		if ( preg_match( '/^h([1-6])$/', $title_tag, $matches ) ) {
+			$title_level = (int) $matches[1];
+		}
+		$title_has_native_heading = preg_match( '/^h[1-6]$/', $title_tag ) === 1;
+
 		$panels = empty( $instance['panels'] ) ? array() : $instance['panels'];
 
 		$anchor_list = array();
 
 		foreach ( $panels as $i => &$panel ) {
-			if ( empty( $panel['before_title'] ) ) {
-				$panel['before_title'] = '';
-			}
-
-			if ( empty( $panel['after_title'] ) ) {
-				$panel['after_title'] = '';
-			}
+			// before_title/after_title are filter-owned template slots (e.g.
+			// SiteOrigin Premium injects title-icon markup via the
+			// siteorigin_widgets_template_variables_{id_base} filter, which
+			// runs AFTER this method) — they are never legitimate instance
+			// data. Reset them unconditionally so a value stored in the
+			// instance (e.g. injected before the unknown-key strip existed,
+			// or carried by pre-strip-signed content on render paths that
+			// never pass through update()) can never reach the template.
+			$panel['before_title'] = '';
+			$panel['after_title'] = '';
 
 			if ( empty( $panel['title'] ) ) {
 				$id = $this->id_base;
@@ -255,13 +285,34 @@ class SiteOrigin_Widget_Accordion_Widget extends SiteOrigin_Widget {
 			'panels' => $panels,
 			'icon_open' => $instance['design']['heading']['icon_open'],
 			'icon_close' => $instance['design']['heading']['icon_close'],
+			'title_tag' => $title_tag,
+			'title_level' => $title_level,
+			'title_has_native_heading' => $title_has_native_heading,
 		);
 	}
 
 	public function render_panel_content( $panel, $instance ) {
 		$content = $panel['autop'] ? wpautop( $panel['content_text'] ) : $panel['content_text'];
 
-		echo apply_filters( 'siteorigin_widgets_accordion_render_panel_content', $content, $panel, $instance );
+		$content = apply_filters( 'siteorigin_widgets_accordion_render_panel_content', $content, $panel, $instance );
+
+		$lazy_iframes = apply_filters( 'siteorigin_widgets_accordion_lazy_iframes', true, $panel, $instance );
+		if ( $lazy_iframes ) {
+			// Ensure oEmbed URLs are converted before we swap iframes.
+			if ( class_exists( 'WP_Embed' ) ) {
+				global $wp_embed;
+				if ( $wp_embed instanceof WP_Embed ) {
+					$content = $wp_embed->autoembed( $content );
+					$content = $wp_embed->run_shortcode( $content );
+				}
+			}
+
+			// Replace iframe tags so we can swap them back on panel open for lazy loading.
+			$content = preg_replace( '/<\s*iframe\b([^>]*)>/i', '<so-iframe$1>', $content );
+			$content = preg_replace( '/<\/\s*iframe\s*>/i', '</so-iframe>', $content );
+		}
+
+		echo $content;
 	}
 
 	public function get_form_teaser() {

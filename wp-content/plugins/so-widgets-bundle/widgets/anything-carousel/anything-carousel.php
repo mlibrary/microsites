@@ -5,6 +5,7 @@ Description: Display images, text, or any content in a highly customizable and r
 Author: SiteOrigin
 Author URI: https://siteorigin.com
 Documentation: https://siteorigin.com/widgets-bundle/anything-carousel-widget/
+Keywords: image, photo, text
 */
 
 if ( ! class_exists( 'SiteOrigin_Widget_Base_Carousel' ) ) {
@@ -53,7 +54,7 @@ class SiteOrigin_Widget_Anything_Carousel_Widget extends SiteOrigin_Widget_Base_
 			array(
 				'adaptive_height' => array(
 					'type' => 'checkbox',
-					'label' => __( 'Adaptive height', 'so-widgets-bundle' ),
+					'label' => __( 'Adaptive Height', 'so-widgets-bundle' ),
 					'default' => false,
 				),
 			)
@@ -93,7 +94,7 @@ class SiteOrigin_Widget_Anything_Carousel_Widget extends SiteOrigin_Widget_Base_
 						'fields' => array(
 							'bottom_margin' => array(
 								'type' => 'measurement',
-								'label' => __( 'Bottom margin', 'so-widgets-bundle' ),
+								'label' => __( 'Bottom Margin', 'so-widgets-bundle' ),
 								'default' => '24px',
 							),
 						),
@@ -109,7 +110,7 @@ class SiteOrigin_Widget_Anything_Carousel_Widget extends SiteOrigin_Widget_Base_
 							),
 							'size' => array(
 								'type' => 'measurement',
-								'label' => __( 'Font size', 'so-widgets-bundle' ),
+								'label' => __( 'Font Size', 'so-widgets-bundle' ),
 							),
 							'color' => array(
 								'type' => 'color',
@@ -146,29 +147,38 @@ class SiteOrigin_Widget_Anything_Carousel_Widget extends SiteOrigin_Widget_Base_
 						'label' => __( 'Navigation', 'so-widgets-bundle' ),
 						'hide' => true,
 						'fields' => array(
+							'arrows_location' => array(
+								'type' => 'radio',
+								'label' => __( 'Arrows Location', 'so-widgets-bundle' ),
+								'default' => 'left_right',
+								'options' => array(
+									'left_right' => __( 'Left and Right', 'so-widgets-bundle' ),
+									'bottom_right' => __( 'Bottom Right', 'so-widgets-bundle' ),
+								),
+							),
 							'arrow_color' => array(
 								'type' => 'color',
-								'label' => __( 'Arrows color', 'so-widgets-bundle' ),
+								'label' => __( 'Arrows Color', 'so-widgets-bundle' ),
 								'default' => '#626262',
 							),
 							'arrow_color_hover' => array(
 								'type' => 'color',
-								'label' => __( 'Arrows hover color', 'so-widgets-bundle' ),
+								'label' => __( 'Arrows Hover Color', 'so-widgets-bundle' ),
 								'default' => '#000',
 							),
 							'arrow_margin' => array(
 								'type' => 'measurement',
-								'label' => __( 'Arrows margin', 'so-widgets-bundle' ),
+								'label' => __( 'Arrows Margin', 'so-widgets-bundle' ),
 								'description' => __( 'The space between the navigation arrows and items.', 'so-widgets-bundle' ),
 							),
 							'dots_color' => array(
 								'type' => 'color',
-								'label' => __( 'Dots color', 'so-widgets-bundle' ),
+								'label' => __( 'Dots Color', 'so-widgets-bundle' ),
 								'default' => '#bebebe',
 							),
 							'dots_color_hover' => array(
 								'type' => 'color',
-								'label' => __( 'Dots selected and hover color', 'so-widgets-bundle' ),
+								'label' => __( 'Dots Selected and Hover Color', 'so-widgets-bundle' ),
 								'default' => '#f14e4e',
 							),
 						),
@@ -251,7 +261,7 @@ class SiteOrigin_Widget_Anything_Carousel_Widget extends SiteOrigin_Widget_Base_
 	}
 
 	public function get_less_variables( $instance ) {
-		if ( empty( $instance ) ) {
+		if ( empty( $instance ) || empty( $instance['design'] ) ) {
 			return array();
 		}
 
@@ -295,19 +305,23 @@ class SiteOrigin_Widget_Anything_Carousel_Widget extends SiteOrigin_Widget_Base_
 
 	public function get_template_variables( $instance, $args ) {
 		$carousel_settings = $this->carousel_settings_template_variables( $instance['carousel_settings'], false );
+		$arrows_location = ! empty( $instance['design']['navigation']['arrows_location'] ) ? $instance['design']['navigation']['arrows_location'] : 'left_right';
 		$carousel_settings['adaptive_height'] = $instance['carousel_settings']['adaptive_height'];
+		$carousel_settings['appendDots'] = $arrows_location === 'bottom_right';
 
 		return array(
 			'settings' => array(
 				'title' => $instance['title'],
 				'item_template' => plugin_dir_path( __FILE__ ) . 'tpl/item.php',
-				'navigation' => 'side',
+				'navigation' => $arrows_location === 'bottom_right' ? 'container' : 'side',
 				'navigation_arrows' => isset( $instance['carousel_settings']['arrows'] ) ? ! empty( $instance['carousel_settings']['arrows'] ) : true,
+				'navigation_dots' => isset( $instance['carousel_settings']['dots'] ) ? ! empty( $instance['carousel_settings']['dots'] ) : true,
 				'item_title_tag' => siteorigin_widget_valid_tag(
 					$instance['design']['item_title']['tag'],
 					'h4'
 				),
 				'items' => ! empty( $instance['items'] ) ? $instance['items'] : array(),
+				'container_classes' => $arrows_location === 'bottom_right' ? array( 'sow-anything-carousel-nav-bottom-right' ) : array(),
 				'attributes' => array(
 					'widget' => 'anything',
 					'item_count' => ! empty( $instance['items'] ) ? count( $instance['items'] ) : 0,

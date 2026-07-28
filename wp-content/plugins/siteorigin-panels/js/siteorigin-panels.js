@@ -410,9 +410,11 @@ module.exports = panels.view.dialog.extend( {
 	dialogClass: 'so-panels-dialog-prebuilt-layouts',
 	dialogIcon: 'layouts',
 
-	layoutCache: {},
 	currentTab: false,
 	directoryPage: 1,
+	maxPages: 1,
+	itemsPer: 16,
+	activeFilter: [],
 
 	events: {
 		'click .so-close': 'closeDialog',
@@ -420,9 +422,16 @@ module.exports = panels.view.dialog.extend( {
 		'click .so-content .layout': 'layoutClickHandler',
 		'keyup .so-sidebar-search': 'searchHandler',
 
-		// The directory items
+		// The directory items.
 		'click .so-screenshot, .so-title': 'directoryItemClickHandler',
 		'keyup .so-directory-item': 'clickTitleOnEnter',
+
+		// Filtering.
+		'click .so-directory-items-filter-categories li': 'filterCategory',
+		'click .so-directory-items-filter-niches li': 'filterNiches',
+
+		'click .so-previous': 'previousPage',
+		'click .so-next': 'nextPage',
 	},
 
 	clickTitleOnEnter: function( e ) {
@@ -591,7 +600,7 @@ module.exports = panels.view.dialog.extend( {
 			if ( $( '.block-editor-page' ).length ) {
 				var currentBlockPosition = thisView.getCurrentBlockPosition();
 				if ( currentBlockPosition >= 0 ) {
-					panelsData.name += '-' + currentBlockPosition; 
+					panelsData.name += '-' + currentBlockPosition;
 				}
 			}
 			$$.find( 'input[name="panels_export_data"]' ).val( JSON.stringify( panelsData ) );
@@ -605,7 +614,7 @@ module.exports = panels.view.dialog.extend( {
 	getCurrentBlockPosition: function() {
 		var selectedBlockClientId = wp.data.select( 'core/block-editor' ).getSelectedBlockClientId();
 		return wp.data.select( 'core/block-editor' ).getBlocks().findIndex( function ( block ) {
-		  return block.clientId === selectedBlockClientId;
+			return block.clientId === selectedBlockClientId;
 		} );
 	},
 
@@ -628,7 +637,7 @@ module.exports = panels.view.dialog.extend( {
 			type = 'directory-siteorigin';
 		}
 
-		if ( type.match('^directory-') && ! panelsOptions.directory_enabled ) {
+		if ( this.isLayoutDirectory() && ! panelsOptions.directory_enabled ) {
 			// Display the button to enable the prebuilt layout
 			c.removeClass( 'so-panels-loading' ).html( $( '#siteorigin-panels-directory-enable' ).html() );
 			c.find( '.so-panels-enable-directory' ).on( 'click', function( e ) {
@@ -655,9 +664,9 @@ module.exports = panels.view.dialog.extend( {
 			panelsOptions.ajaxurl,
 			{
 				action: 'so_panels_layouts_query',
-				search: search,
 				page: page,
 				type: type,
+				search: search,
 				builderType: this.builder.config.builderType,
 			},
 			function ( data ) {
@@ -669,25 +678,38 @@ module.exports = panels.view.dialog.extend( {
 				// Add the directory items
 				c.removeClass( 'so-panels-loading' ).html( thisView.directoryTemplate( data ) );
 
-				// Lets setup the next and previous buttons
-				var prev = c.find( '.so-previous' ), next = c.find( '.so-next' );
-
-				if ( page <= 1 ) {
-					prev.addClass( 'button-disabled' );
+				// Depending on the active type, we need to handle things slightly differently.
+				if ( type.match( '^directory-' ) ) {
+					thisView.directoryPage = page;
+					thisView.maxPages = data.max_num_pages;
+					thisView.updatePagination();
 				} else {
-					prev.on( 'click', function( e ) {
-						e.preventDefault();
-						thisView.displayLayoutDirectory( search, page - 1, thisView.currentTab );
-					} );
+					// Lets setup the next and previous buttons
+					var prev = c.find( '.so-previous' ), next = c.find( '.so-next' );
+
+					if ( page <= 1 ) {
+						prev.addClass( 'button-disabled' );
+					} else {
+						prev.on( 'click', function( e ) {
+							e.preventDefault();
+							thisView.displayLayoutDirectory( search, page - 1, thisView.currentTab );
+						} );
+					}
+
+					if ( page === data.max_num_pages || data.max_num_pages === 0 ) {
+						next.addClass( 'button-disabled' );
+					} else {
+						next.on( 'click', function( e ) {
+							e.preventDefault();
+							thisView.displayLayoutDirectory( search, page + 1, thisView.currentTab );
+						} );
+					}
+
+					thisView.$( '.so-directory-items' ).toggleClass( 'so-empty', ! data.items.length );
 				}
 
-				if ( page === data.max_num_pages || data.max_num_pages === 0 ) {
-					next.addClass( 'button-disabled' );
-				} else {
-					next.on( 'click', function( e ) {
-						e.preventDefault();
-						thisView.displayLayoutDirectory( search, page + 1, thisView.currentTab );
-					} );
+				if ( page <= 1 ) {
+					c.find( '.so-previous' ).addClass( 'button-disabled' );
 				}
 
 				// Handle nice preloading of the screenshots
@@ -712,6 +734,137 @@ module.exports = panels.view.dialog.extend( {
 			},
 			'json'
 		);
+	},
+
+	filterLayouts: function() {
+		this.directoryPage = 1;
+		this.$( '.so-directory-item ' ).removeClass( 'so-filter' );
+
+		var category = this.$( '.so-directory-items-filter-categories li.so-active-filter' ).data( 'filter' );
+		var niches = this.$( '.so-directory-items-filter-niches li.so-active-filter' ).map( function() {
+		  return $( this ).data( 'filter' );
+		} ).get();
+
+		this.activeFilter = category + niches.map( function( filter ) {
+			return filter;
+		} ).join( '' );
+
+
+		if ( this.activeFilter.length ) {
+			var matchedItems = this.$( '.so-directory-items-wrapper' ).find( this.activeFilter );
+			matchedItems.addClass( 'so-filter' );
+		}
+
+		this.updatePagination();
+
+		var visibleItems = this.$( '.so-directory-item' ).filter(':visible');
+
+		this.$( '.so-directory-items' ).toggleClass(
+			'so-empty',
+			! visibleItems.length
+		);
+	},
+
+	getItems: function() {
+		if ( this.activeFilter.length ) {
+			return this.$( '.so-directory-items-wrapper' ).find( '.so-filter' );
+		} else {
+			return this.$( '.so-directory-items-wrapper .so-directory-item' );
+		}
+	},
+
+	/**
+	 * Get the maximum number of pages for the current context.
+	 *
+	 * @param {*} $items An optional jQuery collection of items to calculate the maximum pages for.
+	 * @returns int The maximum number of pages based on the items and items per page.
+	 */
+	contextualMaxPages: function( $items = null ) {
+		if ( $items === null ) {
+			$items = this.getItems();
+		}
+
+		const contextualMaxPages = Math.ceil( $items.length / this.itemsPer );
+		return contextualMaxPages > this.maxPages ? contextualMaxPages : this.maxPages;
+	},
+
+	updatePagination: function() {
+		var $items = this.getItems();
+
+		const startIndex = this.isLayoutDirectory() ?
+			this.directoryPage - 1 :
+			( this.directoryPage - 1 ) * this.itemsPer;
+
+		const endIndex = startIndex + this.itemsPer;
+
+		// Hide any items not on the current page.
+		this.$( '.so-directory-items-wrapper .so-directory-item' ).addClass( 'so-hidden' );
+		$items.slice( startIndex, endIndex ).removeClass( 'so-hidden' );
+
+		this.$( '.so-previous' ).toggleClass( 'button-disabled', this.directoryPage === 1 );
+		this.$( '.so-next' ).toggleClass(
+			'button-disabled',
+			this.directoryPage === this.contextualMaxPages( $items )
+		);
+	},
+
+	isLayoutDirectory: function() {
+		return this.currentTab.match( '^directory-' );
+	},
+
+	/**
+	 * Update the layout directory interface with the new search value and page.
+	 *
+	 * @param {string} directoryPath - The path to the layout directory.
+	 * @param {Object} config - Configuration options for the update.
+	 * @returns {boolean} - Returns true if the update was successful, otherwise false.
+	 */
+	updateLayoutDirectory: function() {
+		if ( ! this.isLayoutDirectory() ) {
+			return false;
+		}
+
+		const searchVal = this.$( '.so-sidebar-search' ).val().toLowerCase();
+		this.displayLayoutDirectory(
+			searchVal,
+			this.directoryPage,
+			this.currentTab
+		);
+
+		return true;
+	},
+
+	previousPage: function() {
+		if (this.directoryPage > 1) {
+			this.directoryPage--;
+
+			if ( ! this.updateLayoutDirectory() ) {
+				this.updatePagination();
+			}
+		}
+	},
+
+	nextPage: function() {
+		const maxPages = this.contextualMaxPages();
+
+		if ( this.directoryPage < maxPages ) {
+			this.directoryPage++;
+
+			if ( ! this.updateLayoutDirectory() ) {
+				this.updatePagination();
+			}
+		}
+	},
+
+	filterCategory: function( e ) {
+		this.$( '.so-directory-items-filter-categories li.so-active-filter' ).removeClass( 'so-active-filter' );
+		$( e.target ).addClass( 'so-active-filter' );
+		this.filterLayouts();
+	},
+
+	filterNiches: function( e ) {
+		$( e.target ).toggleClass( 'so-active-filter' );
+		this.filterLayouts();
 	},
 
 	/**
@@ -813,7 +966,8 @@ module.exports = panels.view.dialog.extend( {
 	 */
 	searchHandler: function ( e ) {
 		if ( e.keyCode === 13 ) {
-			this.displayLayoutDirectory( $( e.currentTarget ).val(), 1, this.currentTab );
+			var search = $( e.currentTarget ).val().toLowerCase();
+			this.displayLayoutDirectory( search, 1, this.currentTab );
 		}
 	},
 
@@ -894,13 +1048,10 @@ module.exports = panels.view.dialog.extend({
 
 		// Changing the row.
 		'click .row-set-form .so-row-field': 'changeCellTotal',
+		'change .row-set-form .so-row-field': 'changeCellTotal',
+		'click .row-set-form .so-row-count-step': 'adjustCellCount',
 		'click .cell-resize-sizing span': 'changeCellRatio',
 		'click .cell-resize-direction ': 'changeSizeDirection',
-
-		// If user clicks the column size indicator, focus the field.
-		'click .preview-cell-unit ': function( e ) {
-			$( e.target ).next().trigger( 'focus' );
-		},
 
 		'keyup .cell-resize-direction': function( e ) {
 			panels.helpers.accessibility.triggerClickOnEnter( e, true );
@@ -1029,9 +1180,7 @@ module.exports = panels.view.dialog.extend({
 			this.$( 'input[name="cells"].so-row-field' ).val( this.model.get( 'cells' ).length );
 		}
 
-		this.$( 'input.so-row-field' ).on( 'keyup', function() {
-			$(this).trigger('change');
-		});
+		this.$( 'input[name="cells"].so-row-field' ).attr( 'aria-live', 'polite' );
 
 		return this;
 	},
@@ -1184,10 +1333,10 @@ module.exports = panels.view.dialog.extend({
 							);
 
 						$( this ).data( 'newCellClone' ).css( 'width', rowPreview.width() * ncw + 'px' )
-							.find('.preview-cell-weight').html(Math.round(ncw * 1000) / 10);
+							.find( '.preview-cell-weight-input' ).val( Math.round( ncw * 1000 ) / 10 );
 
 						$( this ).data( 'prevCellClone' ).css( 'width', rowPreview.width() * pcw + 'px' )
-							.find('.preview-cell-weight').html(Math.round(pcw * 1000) / 10);
+							.find( '.preview-cell-weight-input' ).val( Math.round( pcw * 1000 ) / 10 );
 					},
 					stop: function (e, ui) {
 						// Remove the clones
@@ -1230,154 +1379,179 @@ module.exports = panels.view.dialog.extend({
 
 			}.bind(this));
 
-			newCell.find( '.preview-cell-weight' ).on( 'click', function( ci ) {
+			var resizeCells = function( refocusIndex = false ) {
+				timeout = setTimeout( function() {
+					var rowPreviewInputs = rowPreview.find( '.preview-cell-weight-input' );
+					// If there are no weight inputs, then skip this.
+					if ( rowPreviewInputs.length === 0 ) {
+						return false;
+					}
 
-				// Disable the draggable while entering values.
-				thisDialog.$( '.resize-handle' ).css( 'pointer-event', 'none' ).draggable( 'disable' );
+					var rowWeights = [],
+						rowChanged = [],
+						changedSum = 0,
+						unchangedSum = 0;
 
-				var resizeCells = function( refocusIndex = false ) {
-					timeout = setTimeout( function() {
-						var rowPreviewInputs = rowPreview.find( '.preview-cell-weight-input' );
-						// If there are no weight inputs, then skip this.
-						if ( rowPreviewInputs.length === 0 ) {
-							return false;
+					rowPreviewInputs.each( function( i, el ) {
+						var val = parseFloat( $( el ).val() );
+						if ( isNaN( val ) ) {
+							val = 1 / thisDialog.row.cells.length;
+						} else {
+							val = Math.round( val * 10 ) / 1000;
 						}
 
-						var rowWeights = [],
-							rowChanged = [],
-							changedSum = 0,
-							unchangedSum = 0;
+						// Check within 3 decimal points.
+						var changed = ! $( el ).hasClass( 'no-user-interacted' );
 
-						rowPreviewInputs.each( function( i, el ) {
-							var val = parseFloat( $( el ).val() );
-							if ( isNaN( val ) ) {
-								val = 1 / thisDialog.row.cells.length;
-							} else {
-								val = Math.round( val * 10 ) / 1000;
+						rowWeights.push( val );
+						rowChanged.push( changed );
+
+						if ( changed ) {
+							changedSum += val;
+						} else {
+							unchangedSum += val;
+						}
+					} );
+
+					if ( changedSum > 0 && unchangedSum > 0 && 1 - changedSum > 0 ) {
+						// Balance out the unchanged rows to occupy the weight left over by the changed sum.
+						for ( var i = 0; i < rowWeights.length; i++ ) {
+							if ( ! rowChanged[ i ] ) {
+								rowWeights[ i ] = (
+										rowWeights[ i ] / unchangedSum
+									) * (
+										1 - changedSum
+									);
 							}
+						}
+					}
 
-							// Check within 3 decimal points.
-							var changed = ! $( el ).hasClass( 'no-user-interacted' );
+					// Last check to ensure total weight is 1.
+					var sum = _.reduce( rowWeights, function ( memo, num ) {
+						return memo + num;
+					} );
 
-							rowWeights.push( val );
-							rowChanged.push( changed );
+					rowWeights = rowWeights.map( function( w ) {
+						return w / sum;
+					} );
 
-							if ( changed ) {
-								changedSum += val;
-							} else {
-								unchangedSum += val;
-							}
+					// Set the new cell weights and regenerate the preview.
+					if ( Math.min.apply( Math, rowWeights ) > 0.01 ) {
+						thisDialog.row.cells.each( function( cell, i ) {
+							cell.set( 'weight', rowWeights[ i ] );
 						} );
+					}
 
-						if ( changedSum > 0 && unchangedSum > 0 && 1 - changedSum > 0 ) {
-							// Balance out the unchanged rows to occupy the weight left over by the changed sum.
-							for ( var i = 0; i < rowWeights.length; i++ ) {
-								if ( ! rowChanged[ i ] ) {
-									rowWeights[ i ] = (
-											rowWeights[ i ] / unchangedSum
-										) * (
-											1 - changedSum
-										);
+					// Now lets animate the cells into their new widths.
+					rowPreview.find( '.preview-cell' ).each( function ( i, el ) {
+						var cellWeight = thisDialog.row.cells.at( i ).get( 'weight');
+						$( el ).animate( { 'width': Math.round( cellWeight * 1000 ) / 10 + "%" }, 250 );
+						$( el ).find( '.preview-cell-weight-input' ).val( Math.round( cellWeight * 1000 ) / 10 );
+					});
+
+					setTimeout( function() {
+						// So the draggable handle is not hidden.
+						thisDialog.regenerateRowPreview();
+
+						if ( typeof refocusIndex === 'number' ) {
+							var $refocusInput = thisDialog.$( '.row-preview .preview-cell-weight-input' ).eq( refocusIndex );
+							if ( $refocusInput.length ) {
+								$refocusInput.focus().select();
+							}
+						}
+					}, 260 );
+
+				}, 100 );
+			}
+
+			newCell.find( '.preview-cell-weight-input' ).each( function( ci ) {
+				var columnId = ci + 1;
+				var maxSize = 100 - ( thisDialog.row.cells.length - 1 );
+				var label = panelsOptions.loc.row.cellInput.replace( '%s', columnId );
+
+				$( this )
+					.attr( {
+						id: 'column-' + columnId,
+						max: maxSize,
+						'aria-label': label,
+					} )
+					.data( 'initialWeight', $( this ).val() )
+					.on( 'focus', function() {
+						clearTimeout( timeout );
+						// Disable the draggable while entering values.
+						thisDialog.$( '.resize-handle' ).css( 'pointer-events', 'none' ).draggable( 'disable' );
+					} )
+					.on( 'keyup', function( e ) {
+						if ( e.keyCode !== 9 ) {
+							// Only register the interaction if the user didn't press tab.
+							$( this ).removeClass( 'no-user-interacted' );
+						}
+
+						// Enter is pressed.
+						if ( e.keyCode === 13 ) {
+							e.preventDefault();
+							resizeCells();
+						}
+
+						// Up or down is pressed.
+						if ( e.keyCode === 38 || e.keyCode === 40 ) {
+							e.preventDefault();
+							var currentVal = parseFloat( $( this ).val() );
+							var maxVal = parseFloat( $( this ).attr( 'max' ) );
+
+							if ( ! isNaN( currentVal ) ) {
+								var nextVal = e.keyCode === 38 ? currentVal + 1 : currentVal - 1;
+								if ( nextVal < 1 ) {
+									nextVal = 1;
 								}
+								if ( ! isNaN( maxVal ) && nextVal > maxVal ) {
+									nextVal = maxVal;
+								}
+								$( this ).val( nextVal ).removeClass( 'no-user-interacted' );
 							}
+
+							// During the row regeneration, the inputs are removed and re-added so we need the id to refocus.
+							var parent = $( e.target ).parents( '.preview-cell' ).index();
+
+							resizeCells( parent );
 						}
-
-						// Last check to ensure total weight is 1.
-						var sum = _.reduce( rowWeights, function ( memo, num ) {
-							return memo + num;
-						} );
-
-						rowWeights = rowWeights.map( function( w ) {
-							return w / sum;
-						} );
-
-						// Set the new cell weights and regenerate the preview.
-						if ( Math.min.apply( Math, rowWeights ) > 0.01 ) {
-							thisDialog.row.cells.each( function( cell, i ) {
-								cell.set( 'weight', rowWeights[ i ] );
-							} );
+					} )
+					.on( 'blur', function() {
+						// Only trigger resize if the value actually changed to avoid
+						// unnecessary DOM regeneration that causes visual movement.
+						var current = $( this ).val();
+						var initial = $( this ).data( 'initialWeight' );
+						if ( current !== initial && ! $( this ).hasClass( 'no-user-interacted' ) ) {
+							resizeCells();
+						} else {
+							// Re-enable drag handles without rebuilding the preview.
+							thisDialog.$( '.resize-handle' ).css( 'pointer-events', '' ).draggable( 'enable' );
 						}
-
-						// Now lets animate the cells into their new widths.
-						rowPreview.find( '.preview-cell' ).each( function ( i, el ) {
-							var cellWeight = thisDialog.row.cells.at( i ).get( 'weight');
-							$( el ).animate( { 'width': Math.round( cellWeight * 1000 ) / 10 + "%" }, 250 );
-							$( el ).find( '.preview-cell-weight-input' ).val( Math.round( cellWeight * 1000 ) / 10 );
-						});
-
-						setTimeout( function() {
-							if ( typeof refocusIndex === 'number' ) {
-								rowPreviewInputs.get( refocusIndex ).focus();
-							}
-
-							// So the draggable handle is not hidden.
-							thisDialog.regenerateRowPreview.bind( thisDialog )
-						}, 260 );
-
-					}, 100 );
-				}
-
-				rowPreview.find( '.preview-cell-weight' ).each( function( ci ) {
-					var columnId = ci + 1;
-					var $$ = jQuery( this ).hide();
-					var maxSize = 100 - ( thisDialog.row.cells.length - 1 );
-					var label = panelsOptions.loc.row.cellInput.replace( '%s', columnId );
-
-					$( `<input
-						type="number"
-						class="preview-cell-weight-input no-user-interacted"
-						id="column-${ columnId }"
-						min="1"
-						max="${ maxSize }"
-						aria-label="${ label }"
-					/>` )
-						.val( parseFloat( $$.html() ) ).insertAfter( $$ )
-						.on( 'focus', function() {
-							clearTimeout( timeout );
-							$( this ).attr( 'type', 'number' );
-						} )
-						.on( 'keyup', function( e ) {
-							if ( e.keyCode !== 9 ) {
-								// Only register the interaction if the user didn't press tab.
-								$( this ).removeClass( 'no-user-interacted' );
-							}
-
-							// Enter is pressed.
-							if ( e.keyCode === 13 ) {
-								e.preventDefault();
-								resizeCells();
-							}
-
-							// Up or down is pressed.
-							if ( e.keyCode === 38 || e.keyCode === 40 ) {
-								e.preventDefault();
-								// During the row regeneration, the inputs are removed and re-added so we need the id to refocus.
-								var parent = $( e.target ).parents( '.preview-cell' ).index();
-
-								resizeCells( parent );
-							}
-						} )
-						.on( 'blur', resizeCells )
-						.on( 'click', function () {
-							// If the input is already focused, the user has clicked a step.
-							if ( $( this ).is( ':focus' ) ) {
-								resizeCells();
-							}
-							$( this ).trigger( 'select' );
-						} );
-				} );
-
-				$( this ).siblings( '.preview-cell-weight-input' ).trigger( 'select' );
-
-				// When the field blurs, we convert the inputs to text to prevent an overlap with the step counter with the percentage.
-				rowPreview.find( '.preview-cell-weight-input' ).on( 'blur', function() {
-					rowPreview.find( '.preview-cell-weight-input' ).attr( 'type', 'text' );
-				} );
+					} )
+					.on( 'click', function () {
+						$( this ).trigger( 'select' );
+					} );
 			} );
 
-			// When a user tabs to  one of the column previews, switch all of them to inputs.
-			newCell.find( '.preview-cell-weight' ).on( 'focus', function( e ) {
-				$( e.target ).trigger( 'click' );
+			newCell.find( '.preview-cell-step' ).on( 'click', function() {
+				var $input = $( this ).closest( '.preview-cell-weight-control' ).find( '.preview-cell-weight-input' );
+				var currentVal = parseFloat( $input.val() );
+
+				if ( isNaN( currentVal ) ) {
+					return;
+				}
+
+				var newVal = $( this ).hasClass( 'preview-cell-step-up' )
+					? currentVal + 1
+					: currentVal - 1;
+
+				if ( newVal < 1 ) {
+					return;
+				}
+
+				$input.val( newVal ).removeClass( 'no-user-interacted' );
+				var parent = $input.parents( '.preview-cell' ).index();
+				resizeCells( parent );
 			} );
 
 		}, this);
@@ -1464,7 +1638,7 @@ module.exports = panels.view.dialog.extend({
 			var cell = thisDialog.row.cells.at(i);
 			$(el)
 				.css('width', cell.get('weight') * 100 + "%")
-				.find('.preview-cell-weight').html(Math.round(cell.get('weight') * 1000) / 10);
+				.find( '.preview-cell-weight-input' ).val( Math.round( cell.get('weight') * 1000 ) / 10 );
 		});
 	},
 
@@ -1493,8 +1667,8 @@ module.exports = panels.view.dialog.extend({
 
 	updateActiveCellClass: function() {
 		$( '.so-active-ratio' ).removeClass( 'so-active-ratio' );
-		var activeCellRatio = this.$( '.preview-cell-weight' ).map( function() {
-			return Math.trunc( Number( $( this ).text() ) );
+		var activeCellRatio = this.$( '.preview-cell-weight-input' ).map( function() {
+			return Math.trunc( Number( $( this ).val() ) );
 		} ).get();
 
 		var cellsCount = this.getCurrentCellCount();
@@ -1547,6 +1721,30 @@ module.exports = panels.view.dialog.extend({
 
 	getCurrentCellCount: function() {
 		return parseInt( this.$('.row-set-form input[name="cells"]').val() );
+	},
+
+	adjustCellCount: function( e ) {
+		e.preventDefault();
+		var $control = $( e.currentTarget ).closest( '.so-row-count-control' );
+		var $input = $control.find( 'input[name="cells"].so-row-field' ).first();
+
+		if ( ! $input.length ) {
+			$input = this.$( '.row-set-form input[name="cells"].so-row-field' ).first();
+		}
+
+		if ( ! $input.length ) {
+			return;
+		}
+
+		var delta = $( e.currentTarget ).hasClass( 'so-row-count-step-up' ) ? 1 : -1;
+		var input = $input.get( 0 );
+		if ( delta > 0 ) {
+			input.stepUp();
+		} else {
+			input.stepDown();
+		}
+
+		this.changeCellTotal();
 	},
 
 	changeCellTotal: function ( cellRatio = 0 ) {
@@ -1617,11 +1815,11 @@ module.exports = panels.view.dialog.extend({
 				// // Now lets animate the cells into their new widths
 				this.$( '.preview-cell' ).each( function( i, el ) {
 					var width = Math.round( thisDialog.row.cells.at( i ).get( 'weight' ) * 1000 ) / 10;
-					var $previewCellWeight = $( el ).find( '.preview-cell-weight' );
+					var $input = $( el ).find( '.preview-cell-weight-input' );
 					// To prevent a jump, don't animate cells that haven't changed size.
-					if ( parseInt( $previewCellWeight.text() ) != width ) {
+					if ( parseFloat( $input.val() ) != width ) {
 						$( el ).animate( { 'width': width + "%" }, 250 );
-						$previewCellWeight.html( width );
+						$input.val( width );
 					}
 				} );
 
@@ -1903,26 +2101,35 @@ module.exports = panels.view.dialog.extend( {
 		} );
 
 		this.on( 'edit_label', function ( text ) {
-			// If text is set to default value, just clear it.
-			if ( text === panelsOptions.widgets[ this.model.get( 'class' ) ][ 'title' ] ) {
-				text = '';
-			}
-			this.model.set( 'label', text );
-			if ( _.isEmpty( text ) ) {
-				this.$( '.so-title' ).text( this.model.getWidgetField( 'title' ) );
-			}
-		}.bind( this ) );
+
+				// If text is set to default value, just clear it.
+				if ( text === panelsOptions.widgets[ this.model.get( 'class' ) ]['title']) {
+					text = '';
+				} else {
+					// Sanitize  widget label.
+					const $tempDiv = $( '<div></div>' ).text( text );
+					text = $tempDiv.text();
+				}
+
+				this.model.set( 'label', text );
+
+				if ( _.isEmpty( text ) ) {
+					this.$( '.so-title' ).text(
+						_.escape(
+							this.model.getWidgetField( 'title' )
+						)
+					);
+				}
+			}.bind( this ) );
 
 		this.on( 'open_dialog_complete', function() {
-			// The form isn't always ready when this event fires.
-			setTimeout( function() {
-				var focusTarget = $( '.so-content .siteorigin-widget-field-repeater-item-top, .so-content input, .so-content select' ).first();
-				if ( focusTarget.length ) {
-					focusTarget.trigger( 'focus' );
-				} else {
-					$( '.so-panels-dialog-wrapper .so-title' ).trigger( 'focus' );
-				}
-			}, 1250 )
+			// If the title isn't visible, focus the first input.
+			const focusTarget = this.$( '.so-title-editable' );
+			if ( focusTarget.length ) {
+				focusTarget.trigger( 'focus' );
+			} else {
+				this.$( '.so-content .siteorigin-widget-field-repeater-item-top, .so-content input, .so-content select' ).first().trigger( 'focus' );
+			}
 		} );
 	},
 
@@ -1934,8 +2141,9 @@ module.exports = panels.view.dialog.extend( {
 		this.renderDialog( this.parseDialogContent( $( '#siteorigin-panels-dialog-widget' ).html(), {} ) );
 		this.loadForm();
 
-		var title = this.model.getWidgetField( 'title' );
-		this.$( '.so-title .widget-name' ).html( title );
+		const rawTitle = this.model.getWidgetField( 'title' );
+		const title = _.escape( rawTitle ).replace( /&quot;/g, '"' );
+		this.$( '.so-title .widget-name' ).text( title );
 		this.$( '.so-edit-title' ).val( title );
 
 		if( ! this.builder.supports( 'addWidget' ) ) {
@@ -2760,7 +2968,17 @@ module.exports = {
 	},
 
 	saveHeartbeat: function( thisDialog ) {
+		var resetButton = function() {
+			jQuery( '.so-saveinline' ).removeAttr( 'disabled' );
+		};
+
 		jQuery( '.so-saveinline' ).attr( 'disabled', 'disabled' )
+
+		if ( this.shouldUseBlockEditorSave( thisDialog ) ) {
+			this.saveBlockEditor( thisDialog, resetButton );
+			return;
+		}
+
 		jQuery( document ).one( 'heartbeat-send', function( event, data ) {
 			data.panels = JSON.stringify( {
 				data: thisDialog.builder.model.getPanelsData(),
@@ -2769,9 +2987,150 @@ module.exports = {
 			} );
 		} );
 		jQuery( document ).one( 'heartbeat-tick', function( event, data ) {
-			jQuery( '.so-saveinline' ).removeAttr( 'disabled' )
+			resetButton();
 		} );
-		wp.autosave.server.triggerSave()
+
+		if (
+			typeof wp !== 'undefined' &&
+			wp.heartbeat &&
+			wp.heartbeat.connectNow
+		) {
+			wp.heartbeat.connectNow();
+			return;
+		}
+
+		if (
+			typeof wp !== 'undefined' &&
+			wp.autosave &&
+			wp.autosave.server
+		) {
+			wp.autosave.server.triggerSave();
+			return;
+		}
+
+		resetButton();
+		if ( window.console && console.warn ) {
+			console.warn( 'Unable to save post.' );
+		}
+	},
+
+	shouldUseBlockEditorSave: function( thisDialog ) {
+		return (
+			typeof wp !== 'undefined' &&
+			wp.data &&
+			wp.data.select &&
+			wp.data.dispatch &&
+			wp.data.select( 'core/editor' ) &&
+			thisDialog &&
+			thisDialog.builder &&
+			thisDialog.builder.config &&
+			thisDialog.builder.config.editorType === 'standalone'
+		);
+	},
+
+	saveBlockEditor: function( thisDialog, resetButton ) {
+		var self = this;
+		var pendingContentChange = thisDialog &&
+			thisDialog.builder &&
+			thisDialog.builder.pendingContentChange;
+
+		Promise.resolve( pendingContentChange )
+			.catch( function() {} )
+			.then( function() {
+				return self.waitForPostSavingUnlock();
+			} )
+			.then( function() {
+				return self.dispatchBlockEditorSave();
+			} )
+			.then( resetButton )
+			.catch( function() {
+				resetButton();
+				if ( window.console && console.warn ) {
+					console.warn( 'Unable to save post.' );
+				}
+			} );
+	},
+
+	dispatchBlockEditorSave: function() {
+		var self = this;
+		var editorSelect = wp.data.select( 'core/editor' );
+		var editorDispatch = wp.data.dispatch( 'core/editor' );
+
+		if ( editorSelect.isSavingPost() ) {
+			return this.waitForPostSaveCompletion( false )
+				.then( function() {
+					return self.dispatchBlockEditorSave();
+				} );
+		}
+
+		if (
+			editorSelect.isEditedPostDirty &&
+			! editorSelect.isEditedPostDirty()
+		) {
+			return Promise.resolve();
+		}
+
+		editorDispatch.savePost();
+		return this.waitForPostSaveCompletion( true );
+	},
+
+	waitForPostSavingUnlock: function() {
+		var editorSelect = wp.data.select( 'core/editor' );
+		if (
+			! editorSelect.isPostSavingLocked ||
+			! editorSelect.isPostSavingLocked()
+		) {
+			return Promise.resolve();
+		}
+
+		return new Promise( function( resolve ) {
+			var unsubscribe = wp.data.subscribe( function() {
+				editorSelect = wp.data.select( 'core/editor' );
+				if (
+					! editorSelect.isPostSavingLocked ||
+					! editorSelect.isPostSavingLocked()
+				) {
+					unsubscribe();
+					setTimeout( resolve, 0 );
+				}
+			} );
+		} );
+	},
+
+	waitForPostSaveCompletion: function( requireStart ) {
+		var editorSelect = wp.data.select( 'core/editor' );
+		var isSaving = editorSelect.isSavingPost() ||
+			( editorSelect.isAutosavingPost && editorSelect.isAutosavingPost() );
+
+		if ( ! requireStart && ! isSaving ) {
+			return Promise.resolve();
+		}
+
+		return new Promise( function( resolve ) {
+			var saveStarted = isSaving;
+			var checks = 0;
+			var unsubscribe = wp.data.subscribe( function() {
+				editorSelect = wp.data.select( 'core/editor' );
+				isSaving = editorSelect.isSavingPost() ||
+					( editorSelect.isAutosavingPost && editorSelect.isAutosavingPost() );
+
+				if ( isSaving ) {
+					saveStarted = true;
+				}
+
+				if ( saveStarted && ! isSaving ) {
+					unsubscribe();
+					setTimeout( resolve, 0 );
+					return;
+				}
+
+				checks++;
+				if ( checks >= 120 ) {
+					unsubscribe();
+					resolve();
+				}
+			} );
+		} );
 	},
 
 }
@@ -2817,6 +3176,10 @@ module.exports = function ( config, force ) {
 		// Save panels data when we close the dialog, if we're in a dialog
 		var dialog = $$.closest( '.so-panels-dialog-wrapper' ).data( 'view' );
 		if ( ! _.isUndefined( dialog ) ) {
+			// Refresh the panelsData when the dialog is initially opened to
+			// prevent triggering unexpected change notifications.
+			builderModel.refreshPanelsData();
+			
 			dialog.on( 'close_dialog', function () {
 				builderModel.refreshPanelsData();
 			} );
@@ -2880,6 +3243,7 @@ var panels = {};
 // Store everything globally
 window.panels = panels;
 window.siteoriginPanels = panels;
+panels.events = _.extend( {}, Backbone.Events );
 
 // Helpers
 panels.helpers = {};
@@ -4080,18 +4444,179 @@ module.exports = Backbone.View.extend( {
 	 * Intialize the context menu
 	 */
 	initialize: function () {
+		this.contextDocument = document;
+		this.contextWindow = window;
 		this.listenContextMenu();
 		this.render();
 		this.attach();
+	},
+
+	getEventNamespace: function () {
+		return '.siteoriginPanelsMenu' + this.cid;
+	},
+
+	getContextDocument: function () {
+		return this.contextDocument || document;
+	},
+
+	getContextWindow: function () {
+		var contextDocument = this.getContextDocument();
+		return this.contextWindow || contextDocument.defaultView || window;
+	},
+
+	getRenderWindow: function () {
+		var renderWindow = this.getContextWindow();
+
+		try {
+			if ( renderWindow.top && renderWindow.top.document ) {
+				renderWindow = renderWindow.top;
+			}
+		}
+		catch ( err ) {}
+
+		return renderWindow;
+	},
+
+	getRenderDocument: function () {
+		var renderWindow = this.getRenderWindow();
+		return renderWindow.document || document;
+	},
+
+	getUniqueWindows: function( windows ) {
+		var uniqueWindows = [];
+
+		_.each( windows, function( candidateWindow ) {
+			if ( candidateWindow && uniqueWindows.indexOf( candidateWindow ) === -1 ) {
+				uniqueWindows.push( candidateWindow );
+			}
+		} );
+
+		return uniqueWindows;
+	},
+
+	getOutsideClickWindows: function () {
+		return this.getUniqueWindows( [
+			this.getContextWindow(),
+			this.getRenderWindow(),
+			window
+		] );
+	},
+
+	getKeyupWindows: function () {
+		return this.getUniqueWindows( [
+			this.getContextWindow(),
+			this.getRenderWindow()
+		] );
+	},
+
+	getPositionForRenderWindow: function( position ) {
+		var renderWindow = this.getRenderWindow();
+		var contextWindow = this.getContextWindow();
+		var translatedPosition = {
+			left: position.left,
+			top: position.top
+		};
+
+		if ( renderWindow === contextWindow ) {
+			return translatedPosition;
+		}
+
+		if ( contextWindow.frameElement ) {
+			var frameRect = contextWindow.frameElement.getBoundingClientRect();
+			var renderScrollLeft = $( renderWindow ).scrollLeft();
+			var renderScrollTop = $( renderWindow ).scrollTop();
+			var contextScrollLeft = $( contextWindow ).scrollLeft();
+			var contextScrollTop = $( contextWindow ).scrollTop();
+			var clientLeft = _.isNumber( position.clientX ) ? position.clientX : position.left - contextScrollLeft;
+			var clientTop = _.isNumber( position.clientY ) ? position.clientY : position.top - contextScrollTop;
+
+			translatedPosition.left = frameRect.left + renderScrollLeft + clientLeft;
+			translatedPosition.top = frameRect.top + renderScrollTop + clientTop;
+		}
+
+		return translatedPosition;
+	},
+
+	getEventPositionForElement: function( el, event ) {
+		var element = el && el[ 0 ] ? el[ 0 ] : null;
+		var targetDocument = element && element.ownerDocument ? element.ownerDocument : document;
+		var targetWindow = targetDocument.defaultView || window;
+		var eventDocument = event && event.target && event.target.ownerDocument ? event.target.ownerDocument : targetDocument;
+		var eventWindow = eventDocument.defaultView || window;
+		var position = {
+			left: event.pageX,
+			top: event.pageY
+		};
+
+		if ( eventWindow === targetWindow ) {
+			return position;
+		}
+
+		if ( eventWindow.frameElement && targetWindow === this.getRenderWindow() ) {
+			return this.getPositionForRenderWindow( {
+				left: event.pageX,
+				top: event.pageY,
+				clientX: event.clientX,
+				clientY: event.clientY
+			} );
+		}
+
+		if ( targetWindow.frameElement && eventWindow === this.getRenderWindow() ) {
+			var frameRect = targetWindow.frameElement.getBoundingClientRect();
+
+			position.left = event.clientX - frameRect.left + $( targetWindow ).scrollLeft();
+			position.top = event.clientY - frameRect.top + $( targetWindow ).scrollTop();
+		}
+
+		return position;
+	},
+
+	setContext: function( options ) {
+		options = options || {};
+
+		var contextDocument = options.document;
+		if (
+			! contextDocument &&
+			options.container &&
+			options.container.length &&
+			options.container[ 0 ]
+		) {
+			contextDocument = options.container[ 0 ].ownerDocument;
+		}
+
+		if ( ! contextDocument ) {
+			contextDocument = this.getContextDocument();
+		}
+
+		var contextWindow = options.window || contextDocument.defaultView || window;
+
+		if (
+			this.contextDocument === contextDocument &&
+			this.contextWindow === contextWindow
+		) {
+			return this;
+		}
+
+		this.closeMenu();
+		this.unlistenContextMenu();
+
+		this.contextDocument = contextDocument;
+		this.contextWindow = contextWindow;
+
+		this.attach();
+		this.listenContextMenu();
+
+		return this;
 	},
 
 	/**
 	 * Listen for the right click context menu
 	 */
 	listenContextMenu: function () {
-		var thisView = this;
+		var thisView = this,
+			eventNamespace = 'contextmenu' + this.getEventNamespace();
 
-		$( window ).on( 'contextmenu', function ( e ) {
+		$( this.getContextDocument() ).on( eventNamespace, function ( e ) {
 			if ( thisView.active && ! thisView.isOverEl( thisView.$el, e ) ) {
 				thisView.closeMenu();
 				thisView.active = false;
@@ -4114,9 +4639,22 @@ module.exports = Backbone.View.extend( {
 
 				thisView.openMenu( {
 					left: e.pageX,
-					top: e.pageY
+					top: e.pageY,
+					clientX: e.clientX,
+					clientY: e.clientY
 				} );
 			}
+		} );
+	},
+
+	unlistenContextMenu: function() {
+		var eventNamespace = this.getEventNamespace(),
+			contextWindow = this.getContextWindow();
+		$( this.getContextDocument() ).off( 'contextmenu' + eventNamespace );
+		$( contextWindow ).off( 'keyup' + eventNamespace );
+
+		_.each( this.getOutsideClickWindows(), function( interactionWindow ) {
+			$( interactionWindow ).off( 'click' + eventNamespace );
 		} );
 	},
 
@@ -4125,7 +4663,7 @@ module.exports = Backbone.View.extend( {
 	},
 
 	attach: function () {
-		this.$el.appendTo( 'body' );
+		this.$el.appendTo( this.getRenderDocument().body );
 	},
 
 	/**
@@ -4134,26 +4672,37 @@ module.exports = Backbone.View.extend( {
 	 * @param position
 	 */
 	openMenu: function ( position ) {
+		var $renderWindow = $( this.getRenderWindow() ),
+			eventNamespace = this.getEventNamespace(),
+			thisView = this;
+
+		position = this.getPositionForRenderWindow( position );
+
 		this.trigger( 'open_menu' );
 
 		// Start listening for situations when we should close the menu
-		$( window ).on( 'keyup', {menu: this}, this.keyboardListen );
-		$( window ).on( 'click', {menu: this}, this.clickOutsideListen );
+		_.each( this.getKeyupWindows(), function( interactionWindow ) {
+			$( interactionWindow ).on( 'keyup' + eventNamespace, {menu: thisView}, thisView.keyboardListen );
+		} );
+
+		_.each( this.getOutsideClickWindows(), function( interactionWindow ) {
+			$( interactionWindow ).on( 'click' + eventNamespace, {menu: thisView}, thisView.clickOutsideListen );
+		} );
 
 		// Set the maximum height of the menu
-		this.$el.css( 'max-height', $( window ).height() - 20 );
+		this.$el.css( 'max-height', $renderWindow.height() - 20 );
 
 		// Correct the left position
-		if ( position.left + this.$el.outerWidth() + 10 >= $( window ).width() ) {
-			position.left = $( window ).width() - this.$el.outerWidth() - 10;
+		if ( position.left + this.$el.outerWidth() + 10 >= $renderWindow.width() + $renderWindow.scrollLeft() ) {
+			position.left = $renderWindow.width() + $renderWindow.scrollLeft() - this.$el.outerWidth() - 10;
 		}
 		if ( position.left <= 0 ) {
 			position.left = 10;
 		}
 
 		// Check top position
-		if ( position.top + this.$el.outerHeight() - $( window ).scrollTop() + 10 >= $( window ).height() ) {
-			position.top = $( window ).height() + $( window ).scrollTop() - this.$el.outerHeight() - 10;
+		if ( position.top + this.$el.outerHeight() + 10 >= $renderWindow.height() + $renderWindow.scrollTop() ) {
+			position.top = $renderWindow.height() + $renderWindow.scrollTop() - this.$el.outerHeight() - 10;
 		}
 		if ( position.left <= 0 ) {
 			position.left = 10;
@@ -4168,14 +4717,28 @@ module.exports = Backbone.View.extend( {
 	},
 
 	closeMenu: function () {
+		var eventNamespace = this.getEventNamespace();
+
 		this.trigger( 'close_menu' );
 
 		// Stop listening for situations when we should close the menu
-		$( window ).off( 'keyup', this.keyboardListen );
-		$( window ).off( 'click', this.clickOutsideListen );
+		_.each( this.getKeyupWindows(), function( interactionWindow ) {
+			$( interactionWindow ).off( 'keyup' + eventNamespace, this.keyboardListen );
+		}, this );
+
+		_.each( this.getOutsideClickWindows(), function( interactionWindow ) {
+			$( interactionWindow ).off( 'click' + eventNamespace, this.clickOutsideListen );
+		}, this );
 
 		this.active = false;
 		this.$el.empty().hide();
+	},
+
+	remove: function() {
+		this.closeMenu();
+		this.unlistenContextMenu();
+
+		return Backbone.View.prototype.remove.call( this );
 	},
 
 	/**
@@ -4369,6 +4932,7 @@ module.exports = Backbone.View.extend( {
 	 * @param event
 	 */
 	isOverEl: function ( el, event ) {
+		var eventPosition = this.getEventPositionForElement( el, event );
 		var elPos = [
 			[el.offset().left, el.offset().top],
 			[el.offset().left + el.outerWidth(), el.offset().top + el.outerHeight()]
@@ -4376,8 +4940,8 @@ module.exports = Backbone.View.extend( {
 
 		// Return if this event is over the given element
 		return (
-			event.pageX >= elPos[0][0] && event.pageX <= elPos[1][0] &&
-			event.pageY >= elPos[0][1] && event.pageY <= elPos[1][1]
+			eventPosition.left >= elPos[0][0] && eventPosition.left <= elPos[1][0] &&
+			eventPosition.top >= elPos[0][1] && eventPosition.top <= elPos[1][1]
 		);
 	}
 
@@ -4423,6 +4987,10 @@ module.exports = Backbone.View.extend( {
 	/**
 	 * Initialize the builder
 	 */
+	getEventNamespace: function () {
+		return '.siteoriginPanelsBuilder' + this.cid;
+	},
+
 	initialize: function ( options ) {
 		var builder = this;
 
@@ -4480,11 +5048,12 @@ module.exports = Backbone.View.extend( {
 		this.listenTo( this.model.get( 'rows' ), 'add', this.onAddRow );
 
 		// Reflow the entire builder when ever the
-		$( window ).on( 'resize', function( e ) {
+		this._onWindowResize = function( e ) {
 			if ( e.target === window ) {
 				builder.trigger( 'builder_resize' );
 			}
-		} );
+		};
+		$( window ).on( 'resize' + this.getEventNamespace(), this._onWindowResize );
 
 		// When the data changes in the model, store it in the field
 		this.listenTo( this.model, 'change:data load_panels_data', this.storeModelData );
@@ -4501,7 +5070,7 @@ module.exports = Backbone.View.extend( {
 
 		// Create the context menu for this builder
 		this.menu = new panels.utils.menu( {} );
-		this.listenTo( this.menu, 'activate_context', this.activateContextMenu )
+		this.listenTo( this.menu, 'activate_context', this.activateContextMenu );
 
 		if ( this.config.loadOnAttach ) {
 			this.on( 'builder_attached_to_editor', function () {
@@ -4546,6 +5115,10 @@ module.exports = Backbone.View.extend( {
 			this.dialog = new panels.dialog.builder();
 			this.dialog.builder = this;
 		} else {
+			this.menu.setContext( {
+				container: options.container
+			} );
+
 			// Attach this in the standard way
 			this.$el.appendTo( options.container );
 			this.metabox = options.container.closest( '.postbox' );
@@ -4603,6 +5176,28 @@ module.exports = Backbone.View.extend( {
 		welcomeMessageContainer.find( '.so-message-wrapper' ).html( msgHTML );
 
 		return this;
+	},
+
+	remove: function() {
+		if ( this.menu ) {
+			this.menu.remove();
+			this.menu = null;
+		}
+
+		if ( this._onWindowResize ) {
+			$( window ).off( 'resize' + this.getEventNamespace(), this._onWindowResize );
+			this._onWindowResize = null;
+		}
+
+		if ( !_.isNull( this.rowsSortable ) ) {
+			try {
+				this.rowsSortable.sortable( 'destroy' );
+			}
+			catch ( err ) {}
+			this.rowsSortable = null;
+		}
+
+		return Backbone.View.prototype.remove.call( this );
 	},
 
 	/**
@@ -5339,9 +5934,10 @@ module.exports = Backbone.View.extend( {
 	 */
 	activateContextMenu: function ( e, menu ) {
 		var builder = this;
+		var containsTarget = $.contains( builder.$el.get( 0 ), e.target );
 
 		// Only run this if the event target is a descendant of this builder's DOM element.
-		if ( $.contains( builder.$el.get( 0 ), e.target ) ) {
+		if ( containsTarget ) {
 			// Get the element we're currently hovering over
 			var over = $( [] )
 			.add( builder.$( '.so-panels-welcome-message:visible' ) )
@@ -5426,8 +6022,8 @@ module.exports = Backbone.View.extend( {
 	 */
 	render: function () {
 		var templateArgs = {
-			weight: this.model.get( 'weight' ),
-			totalWeight: this.row.model.get('cells').totalWeight()
+			weight: _.escape( this.model.get( 'weight' ) ),
+			totalWeight: _.escape( this.row.model.get( 'cells' ).totalWeight() )
 		};
 
 		this.setElement( this.template( templateArgs ) );
@@ -5511,13 +6107,17 @@ module.exports = Backbone.View.extend( {
 				}
 			},
 			helper: function ( e, el ) {
+				// Append to the iframe body when inside an iframed editor, otherwise admin body.
+				var targetBody = ( el[0].ownerDocument !== document )
+					? el[0].ownerDocument.body
+					: document.body;
 				var helper = el.clone()
 					.css( {
 						'width': el.outerWidth() + 'px',
 						'z-index': 10000,
 						'position': 'fixed'
 					} )
-					.addClass( 'widget-being-dragged' ).appendTo( 'body' );
+					.addClass( 'widget-being-dragged' ).appendTo( targetBody );
 
 				// Center the helper to the mouse cursor.
 				if ( el.outerWidth() > 720 ) {
@@ -5568,7 +6168,7 @@ module.exports = Backbone.View.extend( {
 				// Set the containment to the cell parent
 				previousCell = cellView.$el.prev().data( 'view' );
 				if ( _.isUndefined( previousCell ) ) {
-					return;
+					return false;
 				}
 
 				// Create the clone for the current cell
@@ -5597,6 +6197,10 @@ module.exports = Backbone.View.extend( {
 				} );
 			},
 			drag: function ( e, ui ) {
+				var nClone = $( this ).data( 'newCellClone' );
+				var pClone = $( this ).data( 'prevCellClone' );
+				if ( ! previousCell || ! nClone || ! pClone ) { return; }
+
 				// Calculate the new cell and previous cell widths as a percent
 				var containerWidth = cellView.row.$el.width() + 10;
 				var ncw = cellView.model.get( 'weight' ) - (
@@ -5610,16 +6214,21 @@ module.exports = Backbone.View.extend( {
 					) / containerWidth
 					);
 
-				$( this ).data( 'newCellClone' ).css( 'width', containerWidth * ncw + 'px'  )
-					.find( '.preview-cell-weight' ).html( Math.round( ncw * 1000 ) / 10 );
+				nClone.css( 'width', containerWidth * ncw + 'px'  )
+					.find( '.preview-cell-weight-input' ).val( Math.round( ncw * 1000 ) / 10 );
 
-				$( this ).data( 'prevCellClone' ).css( 'width', containerWidth * pcw + 'px' )
-					.find( '.preview-cell-weight' ).html( Math.round( pcw * 1000 ) / 10 );
+				pClone.css( 'width', containerWidth * pcw + 'px' )
+					.find( '.preview-cell-weight-input' ).val( Math.round( pcw * 1000 ) / 10 );
 			},
 			stop: function ( e, ui ) {
+				var nClone = $( this ).data( 'newCellClone' );
+				var pClone = $( this ).data( 'prevCellClone' );
+				if ( ! previousCell || ! nClone || ! pClone ) { return; }
+
 				// Remove the clones
-				$( this ).data( 'newCellClone' ).remove();
-				$( this ).data( 'prevCellClone' ).remove();
+				nClone.remove();
+				pClone.remove();
+				$( this ).removeData( [ 'newCellClone', 'prevCellClone' ] );
 
 				var containerWidth = cellView.row.$el.width() + 10;
 				var ncw = cellView.model.get( 'weight' ) - (
@@ -5804,7 +6413,7 @@ module.exports = Backbone.View.extend( {
 	builder: false,
 	className: 'so-panels-dialog-wrapper',
 	dialogClass: '',
-	dialogIcon: '',
+	dialogIcon: 'add-widget',
 	parentDialog: false,
 	dialogOpen: false,
 	editableLabel: false,
@@ -5943,6 +6552,9 @@ module.exports = Backbone.View.extend( {
 				this.parentDialog.dialog.openDialog();
 			}.bind(this) );
 			this.$( '.so-title-bar .so-title' ).before( dialogParent );
+
+			// Remove the Mode Button in dialogs that have a parent dialog.
+			this.$el.find( '.so-button-mode' ).remove();
 		}
 
 		if( this.$( '.so-title-bar .so-title-editable' ).length ) {
@@ -6513,7 +7125,7 @@ module.exports = Backbone.View.extend( {
 	render: function () {
 		this.setElement( this.template() );
 		this.$el.hide();
-		
+
 		if ( $( '#submitdiv #save-post' ).length > 0 ) {
 			var $saveButton = this.$el.find( '.live-editor-save' );
 			$saveButton.text( $saveButton.data( 'save' ) );
@@ -6586,6 +7198,9 @@ module.exports = Backbone.View.extend( {
 		// Move the builder view into the Live Editor
 		this.originalContainer = this.builder.$el.parent();
 		this.builder.$el.appendTo( this.$( '.so-live-editor-builder' ) );
+		this.builder.menu.setContext( {
+			container: this.$( '.so-live-editor-builder' )
+		} );
 		this.builder.$( '.so-tool-button.so-live-editor' ).hide();
 		this.builder.trigger( 'builder_resize' );
 
@@ -6630,6 +7245,9 @@ module.exports = Backbone.View.extend( {
 
 		// Move the builder back to its original container
 		this.builder.$el.appendTo( this.originalContainer );
+		this.builder.menu.setContext( {
+			container: this.originalContainer
+		} );
 		this.builder.$( '.so-tool-button.so-live-editor' ).show();
 		this.builder.trigger( 'builder_resize' );
 	},
@@ -6639,8 +7257,17 @@ module.exports = Backbone.View.extend( {
 	 */
 	closeAndSave: function(){
 		this.close( false );
+
+		if ( panels.helpers.utils.shouldUseBlockEditorSave( this ) ) {
+			panels.helpers.utils.saveBlockEditor( this, function() {} );
+			return;
+		}
+
 		// Finds the submit input for saving without publishing draft posts.
-		$( '#submitdiv input[type="submit"][name="save"], .editor-post-publish-button, .edit-widgets-header__actions .is-primary' )[0].click();
+		var saveButton = $( '#submitdiv input[type="submit"][name="save"], .editor-post-publish-button, .edit-widgets-header__actions .is-primary' )[0];
+		if ( saveButton ) {
+			saveButton.click();
+		}
 	},
 
 	/**
@@ -6913,6 +7540,65 @@ module.exports = Backbone.View.extend( {
 },{}],29:[function(require,module,exports){
 var panels = window.panels, $ = jQuery;
 
+var mergeContextualActions = function( baseActions, customActions, priorityMap ) {
+	var items = [];
+	var order = 0;
+
+	customActions = customActions || {};
+
+	_.each( baseActions, function( action, key ) {
+		if ( Object.prototype.hasOwnProperty.call( customActions, key ) ) {
+			return;
+		}
+
+		items.push( {
+			key: key,
+			action: action,
+			priority: priorityMap && priorityMap[ key ] !== undefined ? priorityMap[ key ] : 50,
+			order: order++
+		} );
+	} );
+
+	_.each( customActions, function( action, key ) {
+		if ( ! action ) {
+			return;
+		}
+
+		var priority = 50;
+		if ( Object.prototype.hasOwnProperty.call( action, 'priority' ) ) {
+			priority = parseInt( action.priority, 10 );
+			if ( isNaN( priority ) ) {
+				priority = 50;
+			}
+		}
+
+		var actionData = _.extend( {}, action );
+		delete actionData.priority;
+
+		items.push( {
+			key: key,
+			action: actionData,
+			priority: priority,
+			order: order++
+		} );
+	} );
+
+	items.sort( function( a, b ) {
+		if ( a.priority === b.priority ) {
+			return a.order - b.order;
+		}
+
+		return a.priority - b.priority;
+	} );
+
+	var ordered = {};
+	_.each( items, function( item ) {
+		ordered[ item.key ] = item.action;
+	} );
+
+	return ordered;
+};
+
 module.exports = Backbone.View.extend( {
 	template: _.template( panels.helpers.utils.processTemplate( $( '#siteorigin-panels-builder-row' ).html() ) ),
 
@@ -6970,8 +7656,8 @@ module.exports = Backbone.View.extend( {
 		}
 
 		this.setElement( this.template( {
-			rowColorLabel: rowColorLabel,
-			rowLabel: rowLabel
+			rowColorLabel: _.escape( rowColorLabel ),
+			rowLabel: _.escape( rowLabel )
 		} ) );
 		this.$el.data( 'view', this );
 
@@ -7078,10 +7764,12 @@ module.exports = Backbone.View.extend( {
 		var height = 0,
 			cellWidth = 0,
 			iconsShown = false,
+			measured = false,
 			cell;
 
 		this.$( '.so-cells .cell' ).each( function () {
 			cell = $( this );
+			if ( ! cell.data( 'view' ) ) { return; } // skip orphan/clone cells
 
 			$( this ).css(
 				'width',
@@ -7089,6 +7777,9 @@ module.exports = Backbone.View.extend( {
 			);
 
 			cellWidth = cell.width();
+			if ( cellWidth > 0 ) {
+				measured = true;
+			}
 			// Ensure this widget is large enough to allow for actions to appear.
 			if ( cellWidth < 215 ) {
 				cell.addClass( 'so-show-icon' );
@@ -7110,7 +7801,8 @@ module.exports = Backbone.View.extend( {
 		} );
 
 		// Resize all the grids and cell wrappers
-		this.$( '.so-cells .cell-wrapper' ).css( 'min-height', Math.max( height, 63 ) + 'px' );
+		var finalMinHeight = measured ? Math.max( height, 63 ) : 63;
+		this.$( '.so-cells .cell-wrapper' ).css( 'min-height', finalMinHeight + 'px' );
 		// If action icons are visible in any cell, give the container a special class.
 		if ( iconsShown ) {
 			this.$( '.so-cells' ).addClass( 'so-action-icons' );
@@ -7138,11 +7830,13 @@ module.exports = Backbone.View.extend( {
 	},
 
 	onLabelChange: function( model, text ) {
-		if ( this.$('.so-row-label').length == 0 ) {
-			this.$( '.so-row-toolbar' ).prepend( '<h3 class="so-row-label">' + text + '</h3>' );
-		} else {
-			this.$('.so-row-label').text( text );
+		if ( this.$( '.so-row-label' ).length == 0 ) {
+			this.$( '.so-row-toolbar' ).prepend(
+				'<h3 class="so-row-label"></h3>'
+			);
 		}
+
+		this.$( '.so-row-label' ).text( text );
 	},
 
 	/**
@@ -7357,6 +8051,17 @@ module.exports = Backbone.View.extend( {
 			actions.delete = { title: panelsOptions.loc.contextual.row_delete, confirm: true };
 		}
 
+		var contextualActions = panelsOptions.contextual && panelsOptions.contextual.actions && panelsOptions.contextual.actions.row
+			? panelsOptions.contextual.actions.row
+			: {};
+		actions = mergeContextualActions( actions, contextualActions, {
+			edit: 10,
+			copy: 20,
+			paste: 30,
+			duplicate: 40,
+			delete: 100
+		} );
+
 		if( ! _.isEmpty( actions ) ) {
 			menu.addSection(
 				'row-actions',
@@ -7381,6 +8086,17 @@ module.exports = Backbone.View.extend( {
 							break;
 						case 'delete':
 							this.visualDestroyModel();
+							break;
+						default:
+							if ( panels.events && panels.events.trigger ) {
+								panels.events.trigger( 'contextual_menu_action', {
+									context: 'row',
+									action: c,
+									view: this,
+									model: this.model,
+									builder: this.builder
+								} );
+							}
 							break;
 					}
 				}.bind( this )
@@ -7796,40 +8512,44 @@ module.exports = Backbone.View.extend( {
 		} );
 
 		// Conditionally show Background related settings.
-		var $background_image = this.$( '.so-field-background_image_attachment' ),
-			$background_image_display = this.$( '.so-field-background_display' ),
-			$background_image_size = this.$( '.so-field-background_image_size' );
-			$background_image_opacity = this.$( '.so-field-background_image_opacity' );
+			const $background_image = this.$( '.so-field-background_image_attachment' );
+			const $background_image_display = this.$( '.so-field-background_display' );
+			const $background_image_size = this.$( '.so-field-background_image_size' );
+			const $background_image_opacity = this.$( '.so-field-background_image_opacity' );
+			const $background_image_alt = this.$( '.so-field-background_image_alt' );
 
-		if (
-			$background_image.length &&
-			(
-				$background_image_display.length ||
-				$background_image_size.length ||
-				$background_image_opacity.length
-			)
-		) {
-			var soBackgroundImageVisibility = function() {
-				var hasImage = $background_image.find( '[name="style[background_image_attachment]"]' );
+			if (
+				$background_image.length &&
+				(
+					$background_image_display.length ||
+					$background_image_size.length ||
+					$background_image_opacity.length ||
+					$background_image_alt.length
+				)
+			) {
+				var soBackgroundImageVisibility = function() {
+					var hasImage = $background_image.find( '[name="style[background_image_attachment]"]' );
 
-				if ( ! hasImage.val() || hasImage.val() == 0 ) {
-					hasImage = $background_image.find( '[name="style[background_image_attachment_fallback]"]' );
+					if ( ! hasImage.val() || hasImage.val() == 0 ) {
+						hasImage = $background_image.find( '[name="style[background_image_attachment_fallback]"]' );
+					}
+
+					if ( hasImage.val() && hasImage.val() != 0 ) {
+						$background_image_display.show();
+						$background_image_size.show();
+						$background_image_opacity.show();
+						$background_image_alt.show();
+					} else {
+						$background_image_display.hide();
+						$background_image_size.hide();
+						$background_image_opacity.hide();
+						$background_image_alt.hide();
+					}
 				}
-
-				if ( hasImage.val() && hasImage.val() != 0 ) {
-					$background_image_display.show();
-					$background_image_size.show();
-					$background_image_opacity.show();
-				} else {
-					$background_image_display.hide();
-					$background_image_size.hide();
-					$background_image_opacity.hide();
-				}
+				soBackgroundImageVisibility();
+				$background_image.find( '[name="style[background_image_attachment]"], [name="style[background_image_attachment_fallback]"]' ).on( 'change', soBackgroundImageVisibility );
+				$background_image.find( '.remove-image' ).on( 'click', soBackgroundImageVisibility );
 			}
-			soBackgroundImageVisibility();
-			$background_image.find( '[name="style[background_image_attachment]"], [name="style[background_image_attachment_fallback]"]' ).on( 'change', soBackgroundImageVisibility );
-			$background_image.find( '.remove-image' ).on( 'click', soBackgroundImageVisibility );
-		}
 
 		// Conditionally show Border related settings.
 		var $border_color = this.$( '.so-field-border_color' ),
@@ -7850,6 +8570,10 @@ module.exports = Backbone.View.extend( {
 			$border_color.find( '.wp-picker-clear' ).on( 'click', soBorderVisibility );
 		}
 
+		if ( typeof $.fn.select2 == 'function' ) {
+			this.$( '.so-select2' ).select2();
+		}
+
 		// Allow other plugins to setup custom fields.
 		$( document ).trigger( 'setup_style_fields', this );
 	}
@@ -7858,6 +8582,65 @@ module.exports = Backbone.View.extend( {
 
 },{}],31:[function(require,module,exports){
 var panels = window.panels, $ = jQuery;
+
+var mergeContextualActions = function( baseActions, customActions, priorityMap ) {
+	var items = [];
+	var order = 0;
+
+	customActions = customActions || {};
+
+	_.each( baseActions, function( action, key ) {
+		if ( Object.prototype.hasOwnProperty.call( customActions, key ) ) {
+			return;
+		}
+
+		items.push( {
+			key: key,
+			action: action,
+			priority: priorityMap && priorityMap[ key ] !== undefined ? priorityMap[ key ] : 50,
+			order: order++
+		} );
+	} );
+
+	_.each( customActions, function( action, key ) {
+		if ( ! action ) {
+			return;
+		}
+
+		var priority = 50;
+		if ( Object.prototype.hasOwnProperty.call( action, 'priority' ) ) {
+			priority = parseInt( action.priority, 10 );
+			if ( isNaN( priority ) ) {
+				priority = 50;
+			}
+		}
+
+		var actionData = _.extend( {}, action );
+		delete actionData.priority;
+
+		items.push( {
+			key: key,
+			action: actionData,
+			priority: priority,
+			order: order++
+		} );
+	} );
+
+	items.sort( function( a, b ) {
+		if ( a.priority === b.priority ) {
+			return a.order - b.order;
+		}
+
+		return a.priority - b.priority;
+	} );
+
+	var ordered = {};
+	_.each( items, function( item ) {
+		ordered[ item.key ] = item.action;
+	} );
+
+	return ordered;
+};
 
 module.exports = Backbone.View.extend( {
 	template: _.template( panels.helpers.utils.processTemplate( $( '#siteorigin-panels-builder-widget' ).html() ) ),
@@ -7897,9 +8680,9 @@ module.exports = Backbone.View.extend( {
 		options = _.extend( {'loadForm': false}, options );
 
 		this.setElement( this.template( {
-			title: this.model.getWidgetField( 'title' ),
+			title: _.escape( this.model.getWidgetField( 'title' ) ),
 			description: this.model.getTitle(),
-			widget_class: this.model.attributes.class
+			widget_class: _.escape( this.model.attributes.class )
 		} ) );
 
 		this.$el.data( 'view', this );
@@ -8140,6 +8923,16 @@ module.exports = Backbone.View.extend( {
 			actions.delete = { title: panelsOptions.loc.contextual.widget_delete, confirm: true };
 		}
 
+		var contextualActions = panelsOptions.contextual && panelsOptions.contextual.actions && panelsOptions.contextual.actions.widget
+			? panelsOptions.contextual.actions.widget
+			: {};
+		actions = mergeContextualActions( actions, contextualActions, {
+			edit: 10,
+			copy: 20,
+			duplicate: 40,
+			delete: 100
+		} );
+
 		if( ! _.isEmpty( actions ) ) {
 			menu.addSection(
 				'widget-actions',
@@ -8161,6 +8954,18 @@ module.exports = Backbone.View.extend( {
 							break;
 						case 'delete':
 							this.visualDestroyModel();
+							break;
+						default:
+							if ( panels.events && panels.events.trigger ) {
+								panels.events.trigger( 'contextual_menu_action', {
+									context: 'widget',
+									action: c,
+									view: this,
+									model: this.model,
+									cell: this.cell,
+									builder: this.cell.row.builder
+								} );
+							}
 							break;
 					}
 				}.bind( this )
