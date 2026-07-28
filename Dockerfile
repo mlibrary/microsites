@@ -1,4 +1,4 @@
-ARG PHP_VERSION=8.2
+ARG PHP_VERSION=8.5
 ARG DEBIAN_VERSION=bullseye
 
 FROM debian:${DEBIAN_VERSION}-slim@sha256:0083feb8da4f624e3a0245e7752af2517d4b81d8b8db50c725644672a132a31b
@@ -41,10 +41,10 @@ RUN apt-get update \
       php${PHP_VERSION}-mbstring \
       php${PHP_VERSION}-mcrypt \
       php${PHP_VERSION}-mysql \
-      php${PHP_VERSION}-opcache \
       php${PHP_VERSION}-readline \
       php${PHP_VERSION}-xml \
       php${PHP_VERSION}-zip \
+      $([ $(echo "${PHP_VERSION}" | sed -e 's/\.//') -lt "85" ] && echo "php${PHP_VERSION}-opcache") \
  && (apt-get distclean || rm -rf  /var/cache/apt/archives /var/lib/apt/lists/*) \
  && a2enmod rewrite \
  && mkdir -p \
@@ -60,15 +60,14 @@ RUN apt-get update \
       /var/cache/apache2/mod_auth_openidc/oidc-sessions/2 \
       /var/cache/apache2/mod_auth_openidc/oidc-sessions/3 \
  && ln -sf /proc/self/fd/1 /var/log/apache2/access.log \
- && ln -sf /proc/self/fd/2 /var/log/apache2/error.log
+ && ln -sf /proc/self/fd/2 /var/log/apache2/error.log \
+ && curl https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
+      > /usr/bin/wp \
+ && chmod +x /usr/bin/wp
 
 # These can be set in compose.yml with a volume instead.
 # COPY docker/web/auth_openidc.conf /etc/apache2/mods-enabled/auth_openidc.conf
 # COPY docker/web/000-default.conf /etc/apache2/sites-available/000-default.conf
 # COPY . /var/www/html
-
-RUN curl https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
-    > /usr/bin/wp && \
-    chmod +x /usr/bin/wp
 
 CMD ["apache2ctl", "-D", "FOREGROUND"]
