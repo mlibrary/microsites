@@ -4,7 +4,7 @@ Donate link: http://www.wpbeginner.com/wpbeginner-needs-your-help/
 Tags: WordPress analytics, google analytics, analytics, google analytics dashboard, Website Analytics
 Requires at least: 5.6.0
 Tested up to: 7.0.0
-Stable tag: 11.1.1
+Stable tag: 11.1.2
 Requires PHP: 7.2
 License: GPL v3
 
@@ -121,6 +121,12 @@ MonsterInsights&reg; is a registered trademark of MonsterInsights LLC. When writ
 4. Want more features? <a href="https://www.monsterinsights.com/?utm_source=wprepo&utm_medium=link&utm_campaign=liteversion">Purchase MonsterInsights Pro</a>!
 
 == Changelog ==
+= 11.1.2: July 29, 2026 =
+- Enhancements: Security hardening across admin and reporting requests
+- Fixes: Charts no longer break when another plugin loads its own copy of ApexCharts
+- Fixes: Reduced admin notification requests that could trip firewall rate limits
+- Fixes: Various bug fixes and updates
+
 = 11.1.1: July 22, 2026 =
 - Fixes: Various bug fixes and updates
 
