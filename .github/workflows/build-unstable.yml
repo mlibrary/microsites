@@ -9,10 +9,6 @@ on:
       - '.github/**'
 
 jobs:
-  setup-buildx:
-    name: Set up Docker Buildx
-    uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
-
   build-unstable:
     name: Build unstable ${{ github.sha }}
     uses: mlibrary/platform-engineering-workflows/.github/workflows/build-unstable.yml@2012bb6a322ad02c45c01372de2f5e2e3d7329ac # v1.6.7

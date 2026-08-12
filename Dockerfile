@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 ARG PHP_VERSION=8.5
 ARG DEBIAN_VERSION=bullseye
 
