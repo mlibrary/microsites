@@ -25,7 +25,7 @@ updates:
   multi-ecosystem-group: "app-dependencies"
   patterns: ["*"]
 
-- package-ecosystem: "composer"
-  directory: "/"
-  multi-ecosystem-group: "app-dependencies"
-  patterns: ["*"]
+#- package-ecosystem: "composer"
+#  directory: "/"
+#  multi-ecosystem-group: "app-dependencies"
+#  patterns: ["*"]
