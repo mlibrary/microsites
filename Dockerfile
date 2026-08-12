@@ -1,7 +1,7 @@
 ARG PHP_VERSION=8.5
 ARG DEBIAN_VERSION=bullseye
 
-FROM debian:${DEBIAN_VERSION}-slim@sha256:0083feb8da4f624e3a0245e7752af2517d4b81d8b8db50c725644672a132a31b
+FROM debian:${DEBIAN_VERSION}-slim@sha256:0083feb8da4f624e3a0245e7752af2517d4b81d8b8db50c725644672a132a31b AS base
 
 ARG PHP_VERSION
 ARG DEBIAN_VERSION
@@ -65,9 +65,13 @@ RUN apt-get update \
       > /usr/bin/wp \
  && chmod +x /usr/bin/wp
 
-# These can be set in compose.yml with a volume instead.
-# COPY docker/web/auth_openidc.conf /etc/apache2/mods-enabled/auth_openidc.conf
-# COPY docker/web/000-default.conf /etc/apache2/sites-available/000-default.conf
-# COPY . /var/www/html
-
+COPY docker/bin/status /usr/local/bin/status
 CMD ["apache2ctl", "-D", "FOREGROUND"]
+
+FROM base AS development
+
+FROM development AS production
+
+COPY docker/web/auth_openidc.conf /etc/apache2/mods-enabled/auth_openidc.conf
+COPY docker/web/000-default.conf /etc/apache2/sites-available/000-default.conf
+COPY --exclude=docker . /var/www/html

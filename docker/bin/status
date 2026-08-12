@@ -1,0 +1,80 @@
+#!/bin/bash
+
+START_TIMESTAMP=`date '+%s'`
+
+if [ x"$1" = x"" ] ;then
+  URL=$(wp --allow-root --path=/var/www/html site list --field=url 2>/dev/null | head -n1)
+else
+  URL="$1"
+fi
+
+## Major Core Updates
+cat <<EOF
+# HELP wordpress_major_core_updates 1 if there are updates available, 0 otherwise
+# TYPE wordpress_major_core_updates gauge
+EOF
+echo -n "wordpress_major_core_updates "
+wp --allow-root --path=/var/www/html --url="$URL" --no-color --quiet \
+  core check-update --major --field=version \
+  | wc -l
+
+
+## Minor Core Updates
+cat <<EOF
+# HELP wordpress_minor_core_updates 1 if there are updates available, 0 otherwise
+# TYPE wordpress_minor_core_updates gauge
+EOF
+echo -n "wordpress_minor_core_updates "
+wp --allow-root --path=/var/www/html --url="$URL" --no-color --quiet \
+  core check-update --minor --field=version \
+  | wc -l
+
+
+## DB Updates
+cat <<EOF
+# HELP wordpress_core_db_updates 1 if there are updates available, 0 otherwise
+# TYPE wordpress_core_db_updates gauge
+EOF
+echo -n "wordpress_db_updates "
+wp --allow-root --path=/var/www/html --url="$URL" --no-color --quiet \
+  core update-db --dry-run \
+  | wc -l
+
+## Plugin Updates
+cat <<EOF
+# HELP wordpress_plugin_updates Number of plugins with updates available
+# TYPE wordpress_plugin_updates gauge
+EOF
+echo -n "wordpress_plugin_updates "
+wp --allow-root --path=/var/www/html --url="$URL" --no-color --quiet \
+  plugin list --update=available --field=update_version \
+  | wc -l
+
+
+## Theme Updates
+cat <<EOF
+# HELP wordpress_theme_updates Number of themes with updates available
+# TYPE wordpress_theme_updates gauge
+EOF
+echo -n "wordpress_theme_updates "
+wp --allow-root --path=/var/www/html --url="$URL" --no-color --quiet \
+  theme list --update=available --field=update_version 2>/dev/null \
+  | wc -l
+
+
+## Status Duration
+STOP_TIMESTAMP=`date '+%s'`
+DURATION=$((STOP_TIMESTAMP - START_TIMESTAMP))
+cat <<EOF
+# HELP wordpress_status_duration Duration of the status check in seconds
+# TYPE wordpress_status_duration gauge
+EOF
+echo "wordpress_status_duration ${DURATION}"
+
+
+## Last Success
+cat <<EOF
+# HELP wordpress_status_last_success Timestamp of the last successful status check
+# TYPE wordpress_status_last_success gauge
+EOF
+echo "wordpress_status_last_success ${STOP_TIMESTAMP}"
