@@ -12,6 +12,7 @@ services:
     - db
     build:
       context: .
+      target: development
     env_file:
     - .env
     volumes:

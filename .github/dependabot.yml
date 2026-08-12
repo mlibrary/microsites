@@ -1,0 +1,31 @@
+version: 2
+multi-ecosystem-groups:
+  app-dependencies:
+    schedule:
+      interval: "weekly"
+      time: "06:00"
+      day: "monday"
+      timezone: "America/Detroit"
+    commit-message:
+      prefix: "Weekly Dependency updates: "
+
+updates:
+- package-ecosystem: "github-actions"
+  directory: "/"
+  multi-ecosystem-group: "app-dependencies"
+  patterns: ["*"]
+
+- package-ecosystem: "docker"
+  directory: "/"
+  multi-ecosystem-group: "app-dependencies"
+  patterns: ["*"]
+
+- package-ecosystem: "docker-compose"
+  directory: "/"
+  multi-ecosystem-group: "app-dependencies"
+  patterns: ["*"]
+
+- package-ecosystem: "composer"
+  directory: "/"
+  multi-ecosystem-group: "app-dependencies"
+  patterns: ["*"]
