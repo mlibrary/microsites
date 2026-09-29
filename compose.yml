@@ -1,7 +1,7 @@
 ---
 services:
   db:
-    image: mariadb:12.3@sha256:ab1c3dd381940233af12512b97d47b508fd3a0f17fbe3ba388739b7bc17cbc0b
+    image: mariadb:13.0@sha256:d4fdec0510ad498e4f3127da30a99df3745bd6d5e611ae6ac5f76403d9284a8d
     volumes:
     - db_data:/var/lib/mysql
     env_file:
